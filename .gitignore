@@ -1,0 +1,14 @@
+controls/simulink_simulations/slprj/
+controls/simulink_tests/slprj/
+*.slxc
+controls/slprj/
+*.asv
+*.autosave
+controls/simulink_models/slprj/
+controls/videos/
+unreal_engine_set_up/
+*.r2019a
+*.original
+**/*.mat
+**/*.csv
+**/*.fig

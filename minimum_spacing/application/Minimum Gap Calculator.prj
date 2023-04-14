@@ -1,0 +1,99 @@
+<deployment-project plugin="plugin.apptool" plugin-version="1.0">
+  <configuration build-checksum="981152210" file="C:\Users\fvall\Documents\lane-change\minimum_spacing\application\Minimum Gap Calculator.prj" location="C:\Users\fvall\Documents\lane-change\minimum_spacing\application" name="Minimum Gap Calculator" target="target.mlapps" target-name="Package App">
+    <param.appname>Minimum Gap Calculator</param.appname>
+    <param.authnamewatermark>Fernando V. Monteiro</param.authnamewatermark>
+    <param.email>fvallada@usc.edu</param.email>
+    <param.company>University of Southern California</param.company>
+    <param.icon />
+    <param.icons />
+    <param.summary>Computation of minimum safe gap for vehicle following.</param.summary>
+    <param.description>Computations take into account user defined parameters that define the worst-case scenario and the following vehicle's reaction. Underlying computations following work from A. Kanaris, P. Ioannou, and F.-S. Ho, "Spacing and Capacity Evaluations for different AHS Concepts"</param.description>
+    <param.screenshot>${PROJECT_ROOT}\app_icon.png</param.screenshot>
+    <param.version>1.0</param.version>
+    <param.products.name />
+    <param.products.id />
+    <param.products.version />
+    <param.platforms />
+    <param.output>${PROJECT_ROOT}</param.output>
+    <param.guid>12cb65e0-a48d-4a90-beb1-10bc071e6f48</param.guid>
+    <unset>
+      <param.icon />
+      <param.icons />
+      <param.version />
+      <param.products.name />
+      <param.products.id />
+      <param.products.version />
+      <param.platforms />
+      <param.output />
+    </unset>
+    <fileset.main>
+      <file>${PROJECT_ROOT}\minimum_spacing_app.mlapp</file>
+    </fileset.main>
+    <fileset.depfun>
+      <file>${PROJECT_ROOT}\uialert_info.png</file>
+      <file>${PROJECT_ROOT}\Vehicle.m</file>
+    </fileset.depfun>
+    <fileset.resources />
+    <fileset.package />
+    <build-deliverables>
+      <file location="C:\Users\fvall\Documents\lane-change\minimum_spacing" name="application" optional="false">C:\Users\fvall\Documents\lane-change\minimum_spacing\application</file>
+    </build-deliverables>
+    <workflow />
+    <matlab>
+      <root>C:\Program Files\MATLAB\R2019a</root>
+      <toolboxes>
+        <toolbox name="matlabcoder" />
+        <toolbox name="embeddedcoder" />
+        <toolbox name="gpucoder" />
+        <toolbox name="fixedpoint" />
+        <toolbox name="matlabhdlcoder" />
+        <toolbox name="neuralnetwork" />
+      </toolboxes>
+      <toolbox>
+        <matlabcoder>
+          <enabled>true</enabled>
+        </matlabcoder>
+      </toolbox>
+      <toolbox>
+        <embeddedcoder>
+          <enabled>true</enabled>
+        </embeddedcoder>
+      </toolbox>
+      <toolbox>
+        <gpucoder>
+          <enabled>true</enabled>
+        </gpucoder>
+      </toolbox>
+      <toolbox>
+        <fixedpoint>
+          <enabled>true</enabled>
+        </fixedpoint>
+      </toolbox>
+      <toolbox>
+        <matlabhdlcoder>
+          <enabled>true</enabled>
+        </matlabhdlcoder>
+      </toolbox>
+      <toolbox>
+        <neuralnetwork>
+          <enabled>true</enabled>
+        </neuralnetwork>
+      </toolbox>
+    </matlab>
+    <platform>
+      <unix>false</unix>
+      <mac>false</mac>
+      <windows>true</windows>
+      <win2k>false</win2k>
+      <winxp>false</winxp>
+      <vista>false</vista>
+      <linux>false</linux>
+      <solaris>false</solaris>
+      <osver>10.0</osver>
+      <os32>false</os32>
+      <os64>true</os64>
+      <arch>win64</arch>
+      <matlab>true</matlab>
+    </platform>
+  </configuration>
+</deployment-project>
