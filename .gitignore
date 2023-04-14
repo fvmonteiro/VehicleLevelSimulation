@@ -12,3 +12,4 @@ unreal_engine_set_up/
 **/*.mat
 **/*.csv
 **/*.fig
+**/*.xlsx
