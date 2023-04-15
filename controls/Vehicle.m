@@ -338,7 +338,6 @@ classdef (Abstract) Vehicle < handle
         
         function [] = setLatController(obj, vxLC, latParams)
             % Define linearized lateral movement matrices
-            
             a1 = 2*(obj.Cf+obj.Cr)/obj.m;
             a2 = 2*(obj.Cf*obj.lf-obj.Cr*obj.lr)/obj.m;
             a3 = 2*(obj.Cf*obj.lf-obj.Cr*obj.lr)/obj.Iz;
@@ -391,25 +390,9 @@ classdef (Abstract) Vehicle < handle
             value = length(fieldnames(obj.inputsIdx));
         end
         
-%         function value = get.x0(obj)
-%             value = obj.initialState(obj.statesIdx.x);
-%         end
-%         
-%         function value = get.y0(obj)
-%             value = obj.initialState(obj.statesIdx.y);
-%         end
-%         
-%         function value = get.vx0(obj)
-%             value = obj.initialState(obj.statesIdx.vx);
-%         end
-        
         function value = get.minVFGap0(obj)
             value = obj.d0 + obj.h*obj.vx0;
         end
-%         
-%         function value = get.vMin(obj)
-%             value = obj.initialState(obj.statesIdx.vx)*0.65;
-%         end
         
         function value = get.plotName(obj)
             if isempty(obj.plotName)

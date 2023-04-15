@@ -26,6 +26,10 @@ classdef Controller < handle
         
     end
     
+%     methods (Abstract)
+%         setGains(obj, controlParams)
+%     end
+
     methods
         function obj = Controller(vehicle, controlType)
             if nargin>0
@@ -291,12 +295,11 @@ classdef Controller < handle
                 - veh.simTime(veh.iterCounter);
             switch obj.type
                 case 'OpenLoop'
-%                     u = obj.openLoopControl(obj.openLoopIterCounter);
                     u = obj.openLoopControl(veh.iterCounter);
 %                     obj.openLoopIterCounter = ...
 %                         obj.openLoopIterCounter + 1;
                 case {'FullStateFeedback', 'SimpleLQR'}
-                    q0 = veh.currentState;%[veh.position; veh.velocity];
+                    q0 = veh.currentState;
                            
                     if nargin<3 % no provided reference
                         ref = [veh.position; veh.desiredSpeed];
@@ -314,7 +317,7 @@ classdef Controller < handle
                     u = obj.K*(ref-q0);
                     
                 case 'Queue LQR' % only used by a cooperative platoon leader
-                    q0 = veh.currentState;%veh.currentState;
+                    q0 = veh.currentState;
                     
                     desiredGap = controlParams;
                     leaderPosition = veh.leader.position;
@@ -332,7 +335,7 @@ classdef Controller < handle
                     u = obj.K*stateError;
             
                 case 'ACC PID'
-                    q0 = veh.currentState;%[veh.position; veh.velocity];
+                    q0 = veh.currentState;
                     
                     leader = veh.leader;
                     if ~isempty(leader)
@@ -364,7 +367,7 @@ classdef Controller < handle
                     end
                     
                 case 'ACC PD'
-                    q0 = veh.currentState;%[veh.position; veh.velocity];
+                    q0 = veh.currentState;
                     
                     leader = veh.leader;
                     if ~isempty(leader)
@@ -686,7 +689,7 @@ classdef Controller < handle
             [sol, ~, exitflag, ~] = fsolve(fun, x0);
             if (exitflag<=0)
                 fprintf('[Min time and fuel] No solution found.')
-                u = 0;
+%                 u = 0;
                 return;
             end
             

@@ -16,17 +16,8 @@ classdef (Abstract) VehicleArray < handle
         inputs
         vehNames
         
-        % state indices
-%         xIdx
-%         vxIdx
-%         yIdx
-%         vyIdx
-%         psiIdx
         nStates
         
-        % control indices
-%         uIdx
-%         deltaIdx
         nInputs
     end
     
@@ -88,7 +79,8 @@ classdef (Abstract) VehicleArray < handle
             for n = 1:length(requestedNames)
                 newIdx = strcmpi(obj.vehNames, requestedNames{n});
                 if sum(newIdx)==0
-                    warning('Vehicle %s not found in this array', requestedNames{n});
+                    warning('Vehicle %s not found in this array', ...
+                        requestedNames{n});
                 end
                 vehIdx = vehIdx | newIdx;
             end
@@ -152,29 +144,6 @@ classdef (Abstract) VehicleArray < handle
         function value = get.nInputs(obj)
             value = obj.vehs(1).nInputs;
         end
-        
-%         function value = get.xIdx(obj)
-%             value = obj.vehs(1).xIdx;
-%         end
-%         function value = get.yIdx(obj)
-%             value = obj.vehs(1).yIdx;
-%         end
-%         function value = get.vxIdx(obj)
-%             value = obj.vehs(1).vxIdx;
-%         end
-%         function value = get.vyIdx(obj)
-%             value = obj.vehs(1).vyIdx;
-%         end
-%         function value = get.psiIdx(obj)
-%             value = obj.vehs(1).psiIdx;
-%         end
-%         function value = get.uIdx(obj)
-%             value = obj.vehs(1).uIdx;
-%         end
-%         function value = get.deltaIdx(obj)
-%             value = obj.vehs(1).deltaIdx;
-%         end
-
         
         %%% PLOT FUNCTIONS %%%
         function fig = plotStatesAllVehs(obj, statesToPlot)

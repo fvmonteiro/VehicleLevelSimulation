@@ -23,10 +23,12 @@ classdef LongitudinalVehicleModel < Vehicle
         currentState
         position
         velocity
+        acceleration
     end
 
     methods
-        function obj = LongitudinalVehicleModel(name, type, simTime, q0, tau)
+        function obj = LongitudinalVehicleModel(name, type, simTime, ...
+                q0, tau)
             % Set variables indices for this class
             obj.statesIdx.x = 1;
             obj.statesIdx.vx = 2;
@@ -34,8 +36,8 @@ classdef LongitudinalVehicleModel < Vehicle
             % Set input indices
             obj.inputsIdx.u = 1;
             
-            % For now [03/24/21], all vehicles are passenger vehicles
-            obj.setVehicleParams('PV');
+%             % For now [03/24/21], all vehicles are passenger vehicles
+%             obj.setVehicleParams('PV');
             
             if nargin > 0
                 obj.name = name;
@@ -98,6 +100,10 @@ classdef LongitudinalVehicleModel < Vehicle
             xNew = xStart + (obj.A*xStart + obj.B*input)*sampling;
 
             % Compute next input (using current states)
+            if xNew(obj.statesIdx.vx) < 0
+                xNew(obj.statesIdx.vx) = 0;
+            end
+
             if nargin>1
                 obj.computeInput(reference);
             else
@@ -110,6 +116,7 @@ classdef LongitudinalVehicleModel < Vehicle
         end
         
         function [u] = computeInput(obj, reference)
+            %computeInput Gets the next step's input from the controller
             if nargin>1
                 u = obj.controller.singleStepInput(reference);
             else
@@ -235,6 +242,14 @@ classdef LongitudinalVehicleModel < Vehicle
         
         function value = get.velocity(obj)
             value = obj.states(obj.iterCounter, obj.statesIdx.vx);
+        end
+
+        function value = get.acceleration(obj)
+            try
+                value = obj.states(obj.iterCounter, obj.statesIdx.ax);
+            catch
+                value = obj.u(obj.iterCounter);
+            end
         end
         
         %%% SETTERS %%%
