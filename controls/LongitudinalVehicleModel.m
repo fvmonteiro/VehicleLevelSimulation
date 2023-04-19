@@ -53,6 +53,93 @@ classdef LongitudinalVehicleModel < Vehicle
             end
             
         end
+
+                %%% GETTERS %%%
+        function value = get.x0(obj)
+            value = obj.x(1);
+        end
+        
+        function value = get.vx0(obj)
+            value = obj.vx(1);
+        end
+        
+        function value = get.u(obj)
+            value = obj.inputs(:, obj.inputsIdx.u);
+        end
+        
+        function value = get.x(obj)
+            value = obj.states(:, obj.statesIdx.x);
+        end
+        
+        function value = get.vx(obj)
+            value = obj.states(:, obj.statesIdx.vx);
+        end
+        
+        function value = get.ax(obj)
+            try
+                value = obj.states(:, obj.statesIdx.ax);
+            catch
+                value = obj.u;
+            end
+        end
+        
+        function value = get.minVehFollGap(obj)
+            if isempty(obj.h)
+                h = obj.lambda1;
+                d0 = obj.lambda2;
+            else
+                h = obj.h;
+                d0 = obj.d0;
+            end
+            value = d0 + h*obj.states(obj.iterCounter, obj.statesIdx.vx);
+        end
+        
+        function value  = get.currentState(obj)
+            value = obj.states(obj.iterCounter, :)';
+        end
+        
+        function value = get.position(obj)
+            value = obj.states(obj.iterCounter, obj.statesIdx.x);
+        end
+        
+        function value = get.velocity(obj)
+            value = obj.states(obj.iterCounter, obj.statesIdx.vx);
+        end
+
+        function value = get.acceleration(obj)
+            try
+                value = obj.states(obj.iterCounter, obj.statesIdx.ax);
+            catch
+                value = obj.u(obj.iterCounter);
+            end
+        end
+        
+        %%% SETTERS %%%
+        
+        function [] = set.x0(obj, value)
+            obj.states(1, obj.statesIdx.x) = value;
+        end
+        
+        function [] = set.x(obj, value)
+            obj.states(:, obj.statesIdx.x) = value;
+        end
+        
+        function [] = set.vx(obj, value)
+            obj.states(:, obj.statesIdx.vx) = value;
+        end
+        
+        function [] = set.ax(obj, value)
+            obj.states(:, obj.statesIdx.ax) = value;
+        end
+        
+        function [] = set.u(obj, value)
+            obj.inputs(:, obj.inputsIdx.u) = value;
+        end
+
+        %%% Methods %%%
+        function [value] = hasLeader(obj)
+            value = ~isempty(obj.leader);
+        end
         
         function [] = includeInSimulation(obj, q0, tau)
             %includeInSimulation sets the vehicle's initial state and other
@@ -122,8 +209,18 @@ classdef LongitudinalVehicleModel < Vehicle
             else
                 u = obj.controller.singleStepInput();
             end
-            obj.inputs(obj.iterCounter + 1) = u;
-            
+            obj.inputs(obj.iterCounter + 1) = u; 
+        end
+
+        function [gap] = computeCurrentGapToLeader(obj)
+            if isempty(obj.leader)
+                gap = 0;
+            else
+                % We need to be sure we're reading samples from the 
+                % same time step
+                k = obj.iterCounter;
+                gap = obj.leader.x(k) - obj.leader.len - obj.x(k);
+            end
         end
         
         function [] = setController(obj, controlType, controlParams)
@@ -184,94 +281,6 @@ classdef LongitudinalVehicleModel < Vehicle
 %             adjLaneVehArray.plotStates({'errors'}, [1, 2, 3:3:adjLaneVehArray.nv]);
 %             adjLaneVehArray.plotStates({'u', 'velocity'}, [1, 2, 3:3:adjLaneVehArray.nv]);
             
-        end
-        
-        %%% GETTERS %%%
-        function value = get.x0(obj)
-            value = obj.x(1);
-        end
-        
-%         function value = get.y0(obj)
-%             value = obj.initialState(obj.statesIdx.y);
-%         end
-        
-        function value = get.vx0(obj)
-            value = obj.vx(1);
-        end
-        
-        function value = get.u(obj)
-            value = obj.inputs(:, obj.inputsIdx.u);
-        end
-        
-        function value = get.x(obj)
-            value = obj.states(:, obj.statesIdx.x);
-        end
-        
-        function value = get.vx(obj)
-            value = obj.states(:, obj.statesIdx.vx);
-        end
-        
-        function value = get.ax(obj)
-            try
-                value = obj.states(:, obj.statesIdx.ax);
-            catch
-                warning(['Acceleration is not a state of this vehicle. '...
-                    'Returning the vehicle''s input instead'])
-                value = obj.u;
-            end
-        end
-        
-        function value = get.minVehFollGap(obj)
-            if isempty(obj.h)
-                h = obj.lambda1;
-                d0 = obj.lambda2;
-            else
-                h = obj.h;
-                d0 = obj.d0;
-            end
-            value = d0 + h*obj.states(obj.iterCounter, obj.statesIdx.vx);
-        end
-        
-        function value  = get.currentState(obj)
-            value = obj.states(obj.iterCounter, :)';
-        end
-        
-        function value = get.position(obj)
-            value = obj.states(obj.iterCounter, obj.statesIdx.x);
-        end
-        
-        function value = get.velocity(obj)
-            value = obj.states(obj.iterCounter, obj.statesIdx.vx);
-        end
-
-        function value = get.acceleration(obj)
-            try
-                value = obj.states(obj.iterCounter, obj.statesIdx.ax);
-            catch
-                value = obj.u(obj.iterCounter);
-            end
-        end
-        
-        %%% SETTERS %%%
-        
-        function [] = set.x0(obj, value)
-            obj.states(1, obj.statesIdx.x) = value;
-        end
-        
-        function [] = set.x(obj, value)
-            obj.states(:, obj.statesIdx.x) = value;
-        end
-        
-        function [] = set.vx(obj, value)
-            obj.states(:, obj.statesIdx.vx) = value;
-        end
-        
-        function [] = set.ax(obj, value)
-            obj.states(:, obj.statesIdx.ax) = value;
-        end
-        
-        function [] = set.u(obj, value)
-            obj.inputs(:, obj.inputsIdx.u) = value;
         end
         
     end

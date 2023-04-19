@@ -11,10 +11,10 @@ classdef SafeVehicleArray < VehicleArray
         end
 
         function createVehicles(obj, names, simTime, initialStates, ...
-                desiredVelocity)
+                desiredVelocity, isConnected)
             for n = 1:length(obj.vehs)
                 obj.vehs(n) = SafeVehicle(names{n}, simTime, ...
-                    initialStates(:, n));
+                    initialStates(:, n), isConnected);
                 obj.vehs(n).desiredVelocity = desiredVelocity(n);
                 if n > 1
                     obj.vehs(n).leader = obj.vehs(n-1);
@@ -23,8 +23,17 @@ classdef SafeVehicleArray < VehicleArray
         end
 
         function [] = singleStepUpdate(obj, desiredAccelerations)
+            if nargin > 1
+                m = length(desiredAccelerations);
+            else
+                m = 0;
+            end
             for n = 1:length(obj.vehs)
-                obj.vehs(n).singleStepUpdate(desiredAccelerations(n));
+                if n <= m
+                    obj.vehs(n).singleStepUpdate(desiredAccelerations(n));
+                else
+                    obj.vehs(n).singleStepUpdate();
+                end
             end
         end
     end

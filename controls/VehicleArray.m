@@ -165,18 +165,6 @@ classdef (Abstract) VehicleArray < handle
                 fig = chosenVehs(n).plotStates(statesToPlot, fig, ...
                     chosenVehs(n).leader);
             end
-            
-%             leaders = zeros(length(chosenVehNames), 1);
-%             if any(contains(statesToPlot, 'gap')) %|| any(contains(statesToPlot, 'gap'))
-%                 leaders = [obj.getVehByName(chosenVehNames).leader];
-%             end
-%             
-%             fig = obj.getVehByName(chosenVehNames{1}).plotStates(statesToPlot, leaders(1));
-%             for n = 2:length(chosenVehNames)
-%                 fig = obj.getVehByName(chosenVehNames{n}).plotStates(statesToPlot, leaders(n), fig);
-%             end
-            
         end
-        
     end
 end

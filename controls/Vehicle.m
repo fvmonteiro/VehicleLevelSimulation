@@ -439,49 +439,52 @@ classdef (Abstract) Vehicle < handle
                 
                 switch lower(statesToPlot{n})
                     case {'long position', 'position', 'x'}
-                        stateLabels{n} = 'x';
+                        stateLabels{n} = '$x$';
                         plottedVar = obj.x;
                         legStr = obj.plotName;
                         unit = 'm';
                     case {'long velocity', 'velocity', 'vx'}
-                        stateLabels{n} = 'v_x';
+                        stateLabels{n} = '$v_x$';
                         plottedVar = obj.vx*obj.mpsToKmph;
                         legStr = obj.plotName;
                         unit = 'km/h';
                     case {'long acceleration', 'acceleration', 'ax'}
-                        stateLabels{n} = 'a_x';
+                        stateLabels{n} = '$a_x$';
                         plottedVar = obj.ax;
                         legStr = obj.plotName;
                         unit = 'm/s^2';
                     case {'lat position', 'y'}
-                        stateLabels{n} = 'y';
+                        stateLabels{n} = '$y$';
                         plottedVar = obj.y;
                         legStr = obj.plotName;
                         unit = 'm';
                     case {'lat velocity', 'vy'}
                         error('Lateral velocity is not (yet) an output')
                     case {'u', 'input'}
-                        stateLabels{n} = 'u';
+                        stateLabels{n} = '$u$';
                         plottedVar = obj.u;
                         legStr = obj.plotName;
                         unit = 'm/s^2';
                     case 'delta'
-                        stateLabels{n} = '\varphi';
+                        stateLabels{n} = '$\varphi$';
                         plottedVar = obj.delta;
                         legStr = obj.plotName;
                         unit = 'rad';
                     case 'gap'
                         stateLabels{n} = 'gap';
+                        if isempty(otherVehs)
+                            continue
+                        end
                         plottedVar = zeros(length(t), length(otherVehs));
                         legStr = cell(length(otherVehs), 1);
                         for k = 1:length(otherVehs)
                             plottedVar(:, k) = obj.computeGap(otherVehs(k));
-                            legStr{k} = [obj.plotName ' to ' 
+                            legStr{k} = [obj.plotName ' to ' ...
                                 otherVehs(k).plotName];
                         end
                         unit = 'm';
                     case {'eg', 'egap'}
-                        stateLabels{n} = 'e_g';
+                        stateLabels{n} = '$e_g$';
                         plottedVar = zeros(length(t), length(otherVehs));
                         legStr = cell(length(otherVehs), 1);
                         for k = 1:length(otherVehs)
@@ -492,7 +495,7 @@ classdef (Abstract) Vehicle < handle
                         end
                         unit = 'm';
                     case {'ev', 'evelocity'}
-                        stateLabels{n} = 'e_v';
+                        stateLabels{n} = '$e_v$';
                         plottedVar = zeros(length(t), length(otherVehs));
                         legStr = cell(length(otherVehs), 1);
                         for k = 1:length(otherVehs)
@@ -504,7 +507,7 @@ classdef (Abstract) Vehicle < handle
                         plottedVar = plottedVar*obj.mpsToKmph;
                         unit = 'km/h';
                     case 'ey'
-                        stateLabels{n} = 'e_Y';
+                        stateLabels{n} = '$e_Y$';
                         if isa(obj,'SimulinkVehicle')
                             plottedVar = obj.simErrors.ey;
                         else
@@ -518,12 +521,13 @@ classdef (Abstract) Vehicle < handle
                         error('Unknown requested state');
                 end
                 
-                plot(t, plottedVar, 'LineWidth', 1.5, lineSpecs{:}); grid on;
+                plot(t, plottedVar, 'LineWidth', 1.5, lineSpecs{:});
+                grid on;
                 if n == nPlottedStates
-                    xlabel('time [s]');
+                    xlabel('time $(s)$', 'Interpreter', 'latex');
                 end
                 xlim([0, ceil(t(end))]);
-                ylabel(['$' stateLabels{n} '[' unit ']$'], ...
+                ylabel([stateLabels{n} ' $(' unit ')$'], ...
                     'Interpreter', 'latex');
                 ymin = min([plottedVar(:); ax.YLim(1)]);
                 ymax = max([plottedVar(:); ax.YLim(2)]);
