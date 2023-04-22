@@ -3,6 +3,9 @@ classdef SafeVehicle < LongitudinalVehicleModel
 
     properties
         hasLaneChangeIntention = false
+        speedCBFparameter = 1
+        safeDistCBFparameter = 1
+        laneChangeDistCBFparameter = [0.01, 1]
     end
 
     properties (SetAccess = private)
@@ -82,16 +85,16 @@ classdef SafeVehicle < LongitudinalVehicleModel
         function [maxAccel] = safeSpeedCBF(obj)
             %safeSpeedCBF computes the CBF that ensures the vehicle
             %respects the maximum velocity constraint
-            alphaSpeed = 1;
+            alpha = obj.speedCBFparameter;
             barrierFunctionValue = ...
                 obj.desiredVelocity - obj.velocity;
             obj.cbfValues(obj.iterCounter, 1) = barrierFunctionValue;
             maxAccel = classKappaFunction('linear', barrierFunctionValue, ...
-                alphaSpeed);
+                alpha);
         end
 
         function [maxAccel] = safeDistanceCBF(obj)
-            alphaDistance = 1;
+            alpha = obj.safeDistCBFparameter;
             if ~obj.hasLeader()
                 maxAccel = max(obj.accelBounds);
             else
@@ -105,7 +108,7 @@ classdef SafeVehicle < LongitudinalVehicleModel
                 obj.cbfValues(obj.iterCounter, 2) = barrierFunctionValue;
                 term1 = minAccel / (egoVelocity + timeHeadway*minAccel);
                 term2 = classKappaFunction('linear', barrierFunctionValue, ...
-                    alphaDistance) - egoVelocity;
+                    alpha) - egoVelocity;
                 if v2v
                     leaderVelocity = obj.leader.vx(k);
                     leaderAccel = obj.leader.ax(k+1); % intended accel at k
@@ -118,9 +121,8 @@ classdef SafeVehicle < LongitudinalVehicleModel
         end
 
         function [maxAccel] = laneChangingDistanceCBF(obj)
-            rho = 0.5;
-            gamma = 1;
-%             alphaDistance = 1;
+            rho = obj.laneChangeDistCBFparameter(1);
+            gamma = obj.laneChangeDistCBFparameter(2);
             if ~obj.hasLeader()
                 maxAccel = max(obj.accelBounds);
             else
@@ -166,7 +168,7 @@ classdef SafeVehicle < LongitudinalVehicleModel
 %                 abs(min(obj.accelBoundsDuringLC)));
 %         end
 
-        function [value] = errorToDesiredGap(obj, timeHeadway, maxBrake)
+        function [value] = errorToDesiredGap(obj, timeHeadway, egoMaxBrake)
             %errorToDesiredGap computes difference between current gap and
             %the desired (collision free) gap
 
@@ -174,7 +176,8 @@ classdef SafeVehicle < LongitudinalVehicleModel
             k = obj.iterCounter;
             egoVel = obj.vx(k);
             leaderVel = obj.leader.vx(k);
-            minimumGap = timeHeadway*egoVel + obj.d0 + egoVel^2/2/maxBrake ...
+            minimumGap = timeHeadway*egoVel + obj.d0 ...
+                + egoVel^2/2/egoMaxBrake ...
                 - leaderVel^2/2/obj.leader.maxBrake;
             value = gap - minimumGap;
         end
