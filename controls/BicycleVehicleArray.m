@@ -1,20 +1,22 @@
-classdef SafeVehicleArray < VehicleArray
-    %SafeVehicleArray Class to easily deal with several Safe Vehicles
+classdef BicycleVehicleArray < VehicleArray
+    %BicycleVehicleArray Class to easily deal with several Bicycle Vehicles
 
     methods
-        function obj = SafeVehicleArray(nv)
+        function obj = BicycleVehicleArray(nv)
             %SafeVehicleArray Construct an instance of this class
             %   We just create an array of vehicles
-            obj.vehs = SafeVehicle.empty;
-            obj.vehs(nv) = SafeVehicle();
+            obj.vehs = BicycleVehicleModel.empty;
+            obj.vehs(nv) = BicycleVehicleModel();
         end
 
         function createVehicles(obj, names, simTime, initialStates, ...
                 desiredVelocity, isConnected)
+            if length(desiredVelocity) == 1
+                desiredVelocity = desiredVelocity * ones(length(obj.vehs));
+            end
             for n = 1:length(obj.vehs)
-                obj.vehs(n) = SafeVehicle(names{n}, simTime, ...
-                    initialStates(:, n), isConnected);
-                obj.vehs(n).desiredVelocity = desiredVelocity(n);
+                obj.vehs(n) = BicycleVehicleModel(names{n}, simTime, ...
+                    initialStates(:, n), desiredVelocity(n), isConnected);
                 if n > 1
                     obj.vehs(n).leader = obj.vehs(n-1);
                 end
@@ -29,10 +31,13 @@ classdef SafeVehicleArray < VehicleArray
             end
             for n = 1:length(obj.vehs)
                 if n <= m
-                    obj.vehs(n).singleStepUpdate(desiredAccelerations(n));
+                    obj.vehs(n).computeInput(desiredAccelerations(n));
                 else
-                    obj.vehs(n).singleStepUpdate();
+                    obj.vehs(n).computeInput();
                 end
+            end
+            for n = 1:length(obj.vehs)
+                obj.vehs(n).updateStates();
             end
         end
     end

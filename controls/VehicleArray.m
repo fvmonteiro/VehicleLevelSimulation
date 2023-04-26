@@ -10,6 +10,7 @@ classdef (Abstract) VehicleArray < handle
         velRatio = 1; % expected vLeader/vFollower in the array
         vehFollCtrlType = 'ACC PID' % default no comms
     end
+    
     properties (Dependent, Hidden)
         len
         states

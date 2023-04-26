@@ -137,6 +137,115 @@ classdef SimulinkVehicle < Vehicle
             end
 
         end
+
+        %%% GETTERS %%%
+        function value = get.x0(obj)
+            value = obj.initialState(obj.statesIdx.x);
+        end
+        
+        function value = get.y0(obj)
+            value = obj.initialState(obj.statesIdx.y);
+        end
+        
+        function value = get.vx0(obj)
+            value = obj.initialState(obj.statesIdx.vx);
+        end
+        
+        function value = get.vMin(obj)
+            value = obj.initialState(obj.statesIdx.vx)*0.65;
+        end
+        
+        function value = get.x(obj)
+            value = obj.states(:, obj.statesIdx.x);
+        end
+        
+        function value = get.y(obj)
+            value = obj.states(:, obj.statesIdx.y);
+        end
+        
+        function value = get.vx(obj)
+            value = obj.states(:, obj.statesIdx.vx);
+        end
+        
+        function value = get.ax(obj)
+            value = obj.states(:, obj.statesIdx.ax);
+        end
+        
+        function value = get.psi(obj)
+            value = obj.states(:, obj.statesIdx.psi);
+        end
+        
+        function value = get.u(obj)
+            value = obj.inputs(:, obj.inputsIdx.u);
+        end
+        
+        function value = get.delta(obj)
+            value = obj.inputs(:, obj.inputsIdx.delta);
+        end
+        
+        function value = get.currentState(obj)
+            if obj.iterCounter > length(obj.simTime)
+                warning(['Iteration counter of simulink vehicle %s ' ...
+                    'restarted'], obj.name);
+                obj.iterCounter = 1;
+            end
+            value = obj.states(obj.iterCounter, :);
+            obj.iterCounter = obj.iterCounter + 1;
+        end
+        
+        %%% SETTERS %%%
+        function [] = set.x0(obj, value)
+            obj.initialState(obj.statesIdx.x) = value;
+        end
+        
+        function [] = set.x(obj, value)
+            obj.states(:, obj.statesIdx.x) = value;
+        end
+        
+        function [] = set.y(obj, value)
+            obj.states(:, obj.statesIdx.y) = value;
+        end
+        
+        function [] = set.vx(obj, value)
+            obj.states(:, obj.statesIdx.vx) = value;
+        end
+        
+        function [] = set.ax(obj, value)
+            obj.states(:, obj.statesIdx.ax) = value;
+        end
+        
+        function [] = set.psi(obj, value)
+            obj.states(:, obj.statesIdx.psi) = value;
+        end
+        
+        function [] = set.u(obj, value)
+            obj.inputs(:, obj.inputsIdx.u) = value;
+        end
+        
+        function [] = set.delta(obj, value)
+            obj.inputs(:, obj.inputsIdx.delta) = value;
+        end
+
+        
+        function [] = setLatController(obj, vxLC, latParams)
+            % Define linearized lateral movement matrices
+            a1 = 2*(obj.Cf+obj.Cr)/obj.m;
+            a2 = 2*(obj.Cf*obj.lf-obj.Cr*obj.lr)/obj.m;
+            a3 = 2*(obj.Cf*obj.lf-obj.Cr*obj.lr)/obj.Iz;
+            a4 = 2*(obj.Cf*obj.lf^2+obj.Cr*obj.lr^2)/obj.Iz;
+            b1 = 2*obj.Cf/obj.m;
+            b2 = 2*obj.Cf*obj.lf/obj.Iz;
+            obj.A = [0 1 vxLC 0;
+                0 -a1/vxLC 0 -vxLC-a2/vxLC;
+                0 0 0 1;
+                0 -a3/vxLC 0 -a4/vxLC];
+            obj.B = [0; b1; 0; b2];
+            obj.C = eye(4);
+            %To observe Y and ang velocity:
+            %obj.C = [1, 0, 5, 0; 0, 0, 1, 0; 0, 0, 0, 1];
+
+            obj.controller.setLatControlGains(latParams);
+        end
         
         %%% PROGRAMMATICALLY SET PARAMETERS IN SIMULINK MODEL %%%
         function [] = setSimParams(obj)
@@ -233,93 +342,6 @@ classdef SimulinkVehicle < Vehicle
                 > obj.lcStateNameToNum.laneChanging, 1);
         end
         
-        %%% GETTERS %%%
-        function value = get.x0(obj)
-            value = obj.initialState(obj.statesIdx.x);
-        end
-        
-        function value = get.y0(obj)
-            value = obj.initialState(obj.statesIdx.y);
-        end
-        
-        function value = get.vx0(obj)
-            value = obj.initialState(obj.statesIdx.vx);
-        end
-        
-        function value = get.vMin(obj)
-            value = obj.initialState(obj.statesIdx.vx)*0.65;
-        end
-        
-        function value = get.x(obj)
-            value = obj.states(:, obj.statesIdx.x);
-        end
-        
-        function value = get.y(obj)
-            value = obj.states(:, obj.statesIdx.y);
-        end
-        
-        function value = get.vx(obj)
-            value = obj.states(:, obj.statesIdx.vx);
-        end
-        
-        function value = get.ax(obj)
-            value = obj.states(:, obj.statesIdx.ax);
-        end
-        
-        function value = get.psi(obj)
-            value = obj.states(:, obj.statesIdx.psi);
-        end
-        
-        function value = get.u(obj)
-            value = obj.inputs(:, obj.inputsIdx.u);
-        end
-        
-        function value = get.delta(obj)
-            value = obj.inputs(:, obj.inputsIdx.delta);
-        end
-        
-        function value = get.currentState(obj)
-            if obj.iterCounter > length(obj.simTime)
-                warning(['Iteration counter of simulink vehicle %s ' ...
-                    'restarted'], obj.name);
-                obj.iterCounter = 1;
-            end
-            value = obj.states(obj.iterCounter, :);
-            obj.iterCounter = obj.iterCounter + 1;
-        end
-        
-        %%% SETTERS %%%
-        function [] = set.x0(obj, value)
-            obj.initialState(obj.statesIdx.x) = value;
-        end
-        
-        function [] = set.x(obj, value)
-            obj.states(:, obj.statesIdx.x) = value;
-        end
-        
-        function [] = set.y(obj, value)
-            obj.states(:, obj.statesIdx.y) = value;
-        end
-        
-        function [] = set.vx(obj, value)
-            obj.states(:, obj.statesIdx.vx) = value;
-        end
-        
-        function [] = set.ax(obj, value)
-            obj.states(:, obj.statesIdx.ax) = value;
-        end
-        
-        function [] = set.psi(obj, value)
-            obj.states(:, obj.statesIdx.psi) = value;
-        end
-        
-        function [] = set.u(obj, value)
-            obj.inputs(:, obj.inputsIdx.u) = value;
-        end
-        
-        function [] = set.delta(obj, value)
-            obj.inputs(:, obj.inputsIdx.delta) = value;
-        end
         
         %%% PLOT FUNCTIONS %%%
         function fig = plotSimErrors(obj, errorsToPlot, varargin)

@@ -3,7 +3,7 @@ classdef CBFScenarios < LongitudinalScenario
     %   Detailed explanation goes here
 
     properties
-        cbfCheckMargin = 0 % TODO: why isn't a hard threshold working?
+        cbfCheckMargin = -0.1 % TODO: why isn't a hard threshold working?
     end
 
     methods
@@ -17,15 +17,16 @@ classdef CBFScenarios < LongitudinalScenario
             %accelAndBrakeTest Follower accelerates to catch up with 
             % leader, and leader performs emergency braking
             finalTime = 150;
-            emergencyBrakingTime = 150;
+            emergencyBrakingTime = 50;
 
             obj.setStopTime(finalTime);
-            obj.vehicleArray = SafeVehicleArray(2);
+            obj.vehicleArray = BicycleVehicleArray(2);
 
             names = {'leader', 'follower'};
             % Create vehicles
-            q0L = [6, 0]';
-            q0F = [0, 0]';
+
+            q0L = [6, 0, 0, 0]';
+            q0F = [0, 0, 0, 0]';
             q = [q0L, q0F];
             desiredVelocity = [30; 30];
             isConnected = true;
@@ -39,9 +40,12 @@ classdef CBFScenarios < LongitudinalScenario
             followerMaxAccel = max(follower.accelBounds);
 
             for k = 1:(length(obj.simTime)-1)
-                if (obj.simTime(k) > emergencyBrakingTime ...
-                    && leader.velocity > 0)
-                    leaderAccel = -leader.maxBrake;
+                if (obj.simTime(k) > emergencyBrakingTime)
+                    if leader.velocity > 0
+                        leaderAccel = -leader.maxBrake;
+                    else
+                        leaderAccel = 0;
+                    end
                 else
                     leaderAccel = 1;
                 end
@@ -59,15 +63,17 @@ classdef CBFScenarios < LongitudinalScenario
             
             nV = 2;
             names = cell(nV, 1);
-            q0 = zeros(2, nV);
+            q0 = zeros(4, nV);
+            y0 = 0;
+            theta0 = 0;
             vx0 = 0;
             for n = 1:nV
                 names{n} = ['veh' num2str(n)];
-                q0(:, n) = [(nV-n) * (vx0 + 1 + 5); vx0];
+                q0(:, n) = [(nV-n) * (vx0 + 1 + 5); y0; theta0; vx0];
             end
             desiredVelocity = 30*ones(nV, 1);
             isConnected = true;
-            obj.vehicleArray = SafeVehicleArray(nV);
+            obj.vehicleArray = BicycleVehicleArray(nV);
             obj.vehicleArray.createVehicles(names, obj.simTime, q0, ...
                 desiredVelocity, isConnected)
             
@@ -88,13 +94,15 @@ classdef CBFScenarios < LongitudinalScenario
 
             nV = 3;
             names = {'fo', 'ego', 'lo'};
-            q0 = zeros(2, nV);
+            q0 = zeros(4, nV);
+            y0 = 0;
+            theta0 = 0;
             vx0 = 20;
             for n = 1:nV
-                q0(:, n) = [(nV-n) * (vx0 + 1 + 5); vx0];
+                q0(:, n) = [(nV-n) * (vx0 + 1 + 5); y0; theta0; vx0];
             end
             desiredVelocity = 30*ones(nV, 1);
-            obj.vehicleArray = SafeVehicleArray(nV);
+            obj.vehicleArray = BicycleVehicleArray(nV);
             isConnected = true;
             obj.vehicleArray.createVehicles(names, obj.simTime, q0, ...
                 desiredVelocity, isConnected)
@@ -121,7 +129,7 @@ classdef CBFScenarios < LongitudinalScenario
 
                 obj.vehicleArray.singleStepUpdate();
 
-                if (ego.cbfValues(k, 3) >= 0 ...
+                if (ego.controller.cbfValuesLog(k, 3) >= 0 ...
                         && simulationGapCreationTime < 0)
                     simulationGapCreationTime = obj.simTime(k) ...
                         - gapGenerationTime;
@@ -130,19 +138,18 @@ classdef CBFScenarios < LongitudinalScenario
             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
 %             obj.cbfCheck();
 
-            rho = ego.laneChangeDistCBFparameter(1);
-            gamma = ego.laneChangeDistCBFparameter(2);
-            theoryGapCreationTime = ...
-                abs(ego.cbfValues(maneuverStartIdx, 3))^(1-rho)...
-                / gamma / (1-rho);
-            fprintf('Simulation T: %.1f\nTheory T: %.1f\n', ...
-                simulationGapCreationTime, theoryGapCreationTime)
+            % rho = ego.controller.laneChangeDistCBFparameter(1);
+            % gamma = ego.controller.laneChangeDistCBFparameter(2);
+            % theoryGapCreationTime = ...
+            %     abs(ego.controller.cbfValuesLog(maneuverStartIdx, 3))^(1-rho)...
+            %     / gamma / (1-rho);
+            fprintf('Simulation T: %.2f\n', simulationGapCreationTime)
+            % fprintf('Theory T: %.1f\n', theoryGapCreationTime)
         end
 
         function [] = cbfCheck(obj)
             for n = 1:length(obj.vehicleArray.vehs)
-                
-                check = obj.vehicleArray.vehs(n).cbfValues ...
+                check = obj.vehicleArray.vehs(n).controller.cbfValuesLog ...
                     < obj.cbfCheckMargin;
                 for k = 1:size(check, 2)
                     if any(check(:, k))
@@ -153,7 +160,7 @@ classdef CBFScenarios < LongitudinalScenario
                             obj.simTime(nonZeroIdx(end)));
                         figure; hold on; grid on;
                         plot(obj.simTime, ...
-                            obj.vehicleArray.vehs(n).cbfValues(:, k))
+                            obj.vehicleArray.vehs(n).controller.cbfValuesLog(:, k))
                         title(sprintf('veh %d, cbf %d', n, k))
                     end
                 end

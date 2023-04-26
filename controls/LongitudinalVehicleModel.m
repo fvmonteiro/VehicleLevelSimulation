@@ -1,25 +1,26 @@
 classdef LongitudinalVehicleModel < Vehicle
     %LongitudinalVehicleModel Double or triple integrator vehicle model 
     % with longitudinal controller
-    properties
-        y = 0
-    end
     
     properties (SetAccess = protected)
         iterCounter = 1;
-        currentInput
+        currentInput  % useless?
     end
        
     properties (Dependent)
         x0
         vx0
         
+        % States and inputs over entire simulation
         x
         vx
         ax
         u
         
         minVehFollGap
+
+        % Current values
+        currentTime
         currentState
         position
         velocity
@@ -54,7 +55,7 @@ classdef LongitudinalVehicleModel < Vehicle
             
         end
 
-                %%% GETTERS %%%
+        %%% GETTERS %%%
         function value = get.x0(obj)
             value = obj.x(1);
         end
@@ -94,6 +95,10 @@ classdef LongitudinalVehicleModel < Vehicle
             value = d0 + h*obj.states(obj.iterCounter, obj.statesIdx.vx);
         end
         
+        function value = get.currentTime(obj)
+            value = obj.simTime(obj.iterCounter);
+        end
+
         function value  = get.currentState(obj)
             value = obj.states(obj.iterCounter, :)';
         end
@@ -136,17 +141,17 @@ classdef LongitudinalVehicleModel < Vehicle
             obj.inputs(:, obj.inputsIdx.u) = value;
         end
 
-        %%% Methods %%%
+        %%% METHODS %%%
         function [value] = hasLeader(obj)
             value = ~isempty(obj.leader);
         end
         
         function [] = includeInSimulation(obj, q0, tau)
-            %includeInSimulation sets the vehicle's initial state and other
-            %related properties
+            %includeInSimulation sets the vehicle's initial state,
+            %initializes state matrix, creates system matrices
 %             obj.initialState = q0;
             
-            obj.inputs = zeros(length(obj.simTime), 1);
+            obj.inputs = zeros(length(obj.simTime), obj.nInputs);
             obj.states = zeros(length(obj.simTime), length(q0));
             obj.states(obj.iterCounter, :) = q0;
             
@@ -186,10 +191,11 @@ classdef LongitudinalVehicleModel < Vehicle
                 - obj.simTime(obj.iterCounter);
             xNew = xStart + (obj.A*xStart + obj.B*input)*sampling;
 
-            % Compute next input (using current states)
             if xNew(obj.statesIdx.vx) < 0
                 xNew(obj.statesIdx.vx) = 0;
             end
+
+            % Compute next input (using current states)
 
             if nargin>1
                 obj.computeInput(reference);

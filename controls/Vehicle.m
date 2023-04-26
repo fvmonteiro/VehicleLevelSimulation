@@ -78,7 +78,8 @@ classdef (Abstract) Vehicle < handle
         nStates
         nInputs
         minVFGap0
-        
+        maxBrake
+        maxBrakeLaneChanging
 %         worstCaseBrakeLeading
 %         worstCaseBrakeFollowing
     end
@@ -110,20 +111,53 @@ classdef (Abstract) Vehicle < handle
             obj.jerkBounds = VehicleTypes.jerkBounds.(vehType);
             obj.comfJerkBounds = VehicleTypes.comfJerkBounds.(vehType);
         end
+
+        %%% GETTERS %%%
+        function value = get.nStates(obj)
+            value = length(fieldnames(obj.statesIdx));
+        end
         
+        function value = get.nInputs(obj)
+            value = length(fieldnames(obj.inputsIdx));
+        end
+        
+        function value = get.minVFGap0(obj)
+            value = obj.d0 + obj.h*obj.vx0;
+        end
+        
+        function value = get.plotName(obj)
+            if isempty(obj.plotName)
+                if any(strcmpi(obj.namesThatChangeForPlot, obj.name))
+                    value = [lower(obj.name(1)) '_' lower(obj.name(2))];
+                else
+                    value = obj.name;
+                end
+            else
+                value = obj.plotName;
+            end
+        end
+        
+        function value = get.maxBrake(obj)
+            value = abs(min(obj.accelBounds));
+        end
+
+        function value = get.maxBrakeLaneChanging(obj)
+            value = abs(min(obj.accelBoundsDuringLC));
+        end
+        
+        %%% Safe gap computations %%%
         function [lambda1, lambda2] = safeHeadwayParams(obj)
             %safeHeadwayParams computes the minimum safe following distance
             %considering the case where the leader brakes with maximum 
             % force and main vehicle is travelling with maximum acceleration
             % Code expects: maxBrake>0 and maxJerk>0
             
-            maxBrake = abs(min(obj.accelBounds));
             maxAccel = max(obj.comfAccelBounds);
             maxJerk = abs(min(obj.jerkBounds));
             delay = obj.reactionTime;
             
             [lambda1, lambda2] = obj.computeHeadwayParams(delay, ...
-                maxAccel, maxBrake, maxJerk);
+                maxAccel, obj.maxBrake, maxJerk);
             obj.lambda1 = lambda1;
             obj.lambda2 = lambda2;
             
@@ -134,13 +168,12 @@ classdef (Abstract) Vehicle < handle
             %lane change maximum deceleration parameters
             % Code expects: maxBrake>0 and maxJerk>0
             
-            maxBrake = abs(min(obj.accelBoundsDuringLC));
             maxAccel = max(obj.accelBoundsDuringLC);
             maxJerk = abs(min(obj.jerkBounds));
             delay = obj.reactionTime;
             
             [lambda1LC, lambda2LC] = obj.computeHeadwayParams(delay, ...
-                maxAccel, maxBrake, maxJerk);
+                maxAccel, obj.maxBrakeLaneChanging, maxJerk);
             obj.lambda1LC = lambda1LC;
             obj.lambda2LC = lambda2LC;
             
@@ -170,30 +203,30 @@ classdef (Abstract) Vehicle < handle
             end
             
             if nargin > 3 && isLaneChanging 
-                maxBrake = abs(min(obj.accelBoundsDuringLC));
+                currentMaxBrake = obj.maxBrakeLaneChanging;
                 param1 = obj.lambda1LC;
                 param2 = obj.lambda2LC;
             else
-                maxBrake = abs(min(obj.accelBounds));
+                currentMaxBrake = obj.maxBrake;
                 param1 = obj.lambda1;
                 param2 = obj.lambda2;
             end
             
-            gamma = leaderMaxBrake/maxBrake;
+            gamma = leaderMaxBrake/currentMaxBrake;
             gammaThreshold = (1-rho)*freeFlowVel/(freeFlowVel+param1);
             
             if gamma<=gammaThreshold
-                timeHeadway = rho/maxBrake/(1-gamma)...
+                timeHeadway = rho/currentMaxBrake/(1-gamma)...
                     *(rho*freeFlowVel/2+param1);
-                constantTerm = param1^2/(2*maxBrake*(1-gamma)) ...
+                constantTerm = param1^2/(2*currentMaxBrake*(1-gamma)) ...
                     + param2;
             elseif gamma>=(1-rho)^2
-                timeHeadway = param1/maxBrake + ...
-                    (gamma-(1-rho)^2)*freeFlowVel/(2*maxBrake*gamma);
-                constantTerm = param1^2/2/maxBrake + param2;
+                timeHeadway = param1/currentMaxBrake + ...
+                    (gamma-(1-rho)^2)*freeFlowVel/(2*currentMaxBrake*gamma);
+                constantTerm = param1^2/2/currentMaxBrake + param2;
             else
-                timeHeadway = param1/maxBrake;
-                constantTerm = param1^2/2/maxBrake + param2;
+                timeHeadway = param1/currentMaxBrake;
+                constantTerm = param1^2/2/currentMaxBrake + param2;
             end
             
             if nargin > 3 && isLaneChanging 
@@ -223,25 +256,25 @@ classdef (Abstract) Vehicle < handle
             
             if nargin > 3 && isLaneChanging
                 maxVel = maxLaneChangeVel;
-                maxBrake = abs(min(obj.accelBounds));
+                currentMaxBrake = obj.maxBrakeLaneChanging;
                 param1 = obj.lambda1LC;
                 relevantH = obj.hLC;
             else
                 maxVel = obj.desiredVelocity;
-                maxBrake = abs(min(obj.accelBounds));
+                currentMaxBrake = obj.maxBrake;
                 param1 = obj.lambda1;
                 relevantH = obj.h;
             end
             
             leaderMaxBrake = abs(min(obj.leader.accelBounds));
-            gamma = leaderMaxBrake/maxBrake;
+            gamma = leaderMaxBrake/currentMaxBrake;
             threshold = (1-rho)*maxVel/(maxVel+param1);
             if gamma > threshold
                 hr = relevantH - (acceptedRisk).^2 ...
-                    /(2*maxVel*maxBrake);
+                    /(2*maxVel*currentMaxBrake);
             else
                 hr = relevantH - (acceptedRisk).^2 ...
-                    /(2*maxVel*maxBrake*(1-gamma));
+                    /(2*maxVel*currentMaxBrake*(1-gamma));
             end
         end
         
@@ -268,10 +301,10 @@ classdef (Abstract) Vehicle < handle
             % speed
             rho = 1;
             
-            maxBrake = abs(min(obj.accelBoundsDuringLC));
+            maxBrakeLC = abs(min(obj.accelBoundsDuringLC));
             
-            gamma = maxBrake/leaderMaxBrake;
-            hLC = obj.lambda1LC + (1-gamma*rho^2)*lcVel/(2*maxBrake);
+            gamma = maxBrakeLC/leaderMaxBrake;
+            hLC = obj.lambda1LC + (1-gamma*rho^2)*lcVel/(2*maxBrakeLC);
             obj.hLC = max(hLC, obj.lambda1LC);
             d0LC = max(obj.lambda2, 0.5);
             obj.d0LC = d0LC;
@@ -301,7 +334,7 @@ classdef (Abstract) Vehicle < handle
             if nargin<3
                 if isempty(obj.leader)
                     eHeadway = zeros(length(obj.simTime), 1);
-                    eVel = obj.desiredVel - obj.vx;
+                    eVel = obj.desiredVelocity - obj.vx;
                     errors = [eHeadway, eVel];
                     return
                 end
@@ -336,26 +369,6 @@ classdef (Abstract) Vehicle < handle
             obj.controller.setVelControlGains(velCtrlPoles);
         end
         
-        function [] = setLatController(obj, vxLC, latParams)
-            % Define linearized lateral movement matrices
-            a1 = 2*(obj.Cf+obj.Cr)/obj.m;
-            a2 = 2*(obj.Cf*obj.lf-obj.Cr*obj.lr)/obj.m;
-            a3 = 2*(obj.Cf*obj.lf-obj.Cr*obj.lr)/obj.Iz;
-            a4 = 2*(obj.Cf*obj.lf^2+obj.Cr*obj.lr^2)/obj.Iz;
-            b1 = 2*obj.Cf/obj.m;
-            b2 = 2*obj.Cf*obj.lf/obj.Iz;
-            obj.A = [0 1 vxLC 0; 
-                0 -a1/vxLC 0 -vxLC-a2/vxLC; 
-                0 0 0 1; 
-                0 -a3/vxLC 0 -a4/vxLC];
-            obj.B = [0; b1; 0; b2];
-            obj.C = eye(4); 
-            %To observe Y and ang velocity: 
-            %obj.C = [1, 0, 5, 0; 0, 0, 1, 0; 0, 0, 0, 1]; 
-            
-            obj.controller.setLatControlGains(latParams);
-        end
-        
         %%% SETTERS %%%
         function [] = set.accelBounds(obj, bounds)
             if bounds(1)>bounds(2)
@@ -375,35 +388,6 @@ classdef (Abstract) Vehicle < handle
         
         function [] = set.tau(obj, newTau)
             obj.tau = max(newTau, obj.minTau);
-        end
-        
-%         function [] = set.x0(obj, value)
-%             obj.initialState(obj.statesIdx.x) = value;
-%         end
-        
-        %%% GETTERS %%%
-        function value = get.nStates(obj)
-            value = length(fieldnames(obj.statesIdx));
-        end
-        
-        function value = get.nInputs(obj)
-            value = length(fieldnames(obj.inputsIdx));
-        end
-        
-        function value = get.minVFGap0(obj)
-            value = obj.d0 + obj.h*obj.vx0;
-        end
-        
-        function value = get.plotName(obj)
-            if isempty(obj.plotName)
-                if any(strcmpi(obj.namesThatChangeForPlot, obj.name))
-                    value = [lower(obj.name(1)) '_' lower(obj.name(2))];
-                else
-                    value = obj.name;
-                end
-            else
-                value = obj.plotName;
-            end
         end
         
         
