@@ -444,6 +444,11 @@ classdef (Abstract) Vehicle < handle
                         unit = 'm';
                     case {'lat velocity', 'vy'}
                         error('Lateral velocity is not (yet) an output')
+                    case 'theta'
+                        stateLabels{n} = '$\theta$';
+                        plottedVar = obj.theta;
+                        legStr = obj.plotName;
+                        unit = 'rad';
                     case {'u', 'input'}
                         stateLabels{n} = '$u$';
                         plottedVar = obj.u;

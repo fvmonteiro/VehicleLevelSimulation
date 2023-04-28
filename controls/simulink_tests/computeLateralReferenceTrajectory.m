@@ -1,6 +1,6 @@
 function Y_ts = computeLateralReferenceTrajectory(vx0, tlc, sim_time)
 
-v0 = vx0;  % from lat_sim_parameters
+v0 = vx0;
 X0 = [0, v0, 0]';
 Xf = [v0*tlc, v0, 0]';
 Y0 = [0, 0, 0]';

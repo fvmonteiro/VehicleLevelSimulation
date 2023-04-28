@@ -3,7 +3,7 @@ classdef CBFScenarios < LongitudinalScenario
     %   Detailed explanation goes here
 
     properties
-        cbfCheckMargin = -0.1 % TODO: why isn't a hard threshold working?
+        cbfCheckMargin = -0.1 % due to discretization errors
     end
 
     methods
@@ -37,7 +37,6 @@ classdef CBFScenarios < LongitudinalScenario
             leader = obj.vehicleArray.getVehByName(names(1));
             follower = obj.vehicleArray.getVehByName(names(2));
             follower.accelBounds(2) = 2;
-            followerMaxAccel = max(follower.accelBounds);
 
             for k = 1:(length(obj.simTime)-1)
                 if (obj.simTime(k) > emergencyBrakingTime)
@@ -50,7 +49,7 @@ classdef CBFScenarios < LongitudinalScenario
                     leaderAccel = 1;
                 end
                 obj.vehicleArray.singleStepUpdate( ...
-                    [leaderAccel, followerMaxAccel]);
+                    [leaderAccel, 0]);
             end
             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
             obj.cbfCheck();
@@ -81,7 +80,7 @@ classdef CBFScenarios < LongitudinalScenario
             amplitude = 3;
             for k = 1:(length(obj.simTime)-1)
                 leaderAccel = amplitude*sin(obj.simTime(k)*2*pi/period);
-                obj.vehicleArray.singleStepUpdate(leaderAccel);
+                obj.vehicleArray.singleStepUpdate([leaderAccel, 0]);
             end
             obj.vehicleArray.plotStates([1 nV], {'gap', 'vx', 'ax'});
             obj.cbfCheck();
@@ -93,7 +92,7 @@ classdef CBFScenarios < LongitudinalScenario
             obj.setStopTime(finalTime);
 
             nV = 3;
-            names = {'fo', 'ego', 'lo'};
+            names = {'lo', 'ego', 'fo'};
             q0 = zeros(4, nV);
             y0 = 0;
             theta0 = 0;
@@ -116,35 +115,70 @@ classdef CBFScenarios < LongitudinalScenario
             % Run
             ego = obj.vehicleArray.getVehByName('ego');
             simulationGapCreationTime = -1;
-            maneuverStartIdx = -1;
+            leaderInputs = [0; 0];
             for k = 1:(length(obj.simTime)-1)
                 if abs(obj.simTime(k) - gapGenerationTime) ...
                         < obj.samplingPeriod/2
-                    maneuverStartIdx = k;
                     ego.hasLaneChangeIntention = true;
                 end
-                if abs(obj.simTime(k) - 50) < obj.samplingPeriod/2
-                    ego.hasLaneChangeIntention = false;
-                end
+%                 if abs(obj.simTime(k) - gapGenerationTime - 3) ...
+%                         < obj.samplingPeriod/2
+%                     leaderAccel = -ego.maxBrake;
+%                 elseif abs(obj.simTime(k) - gapGenerationTime - 5) ...
+%                         < obj.samplingPeriod/2
+%                     leaderAccel = 0;
+%                 end
+%                 if abs(obj.simTime(k) - 50) < obj.samplingPeriod/2
+%                     ego.hasLaneChangeIntention = false;
+%                 end
 
-                obj.vehicleArray.singleStepUpdate();
-
-                if (ego.controller.cbfValuesLog(k, 3) >= 0 ...
+                obj.vehicleArray.singleStepUpdate(leaderInputs);
+                
+                if (ego.computeErrorToLaneChangeGap() >= 0 ...
                         && simulationGapCreationTime < 0)
                     simulationGapCreationTime = obj.simTime(k) ...
                         - gapGenerationTime;
                 end
             end
             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
-%             obj.cbfCheck();
-
-            % rho = ego.controller.laneChangeDistCBFparameter(1);
-            % gamma = ego.controller.laneChangeDistCBFparameter(2);
-            % theoryGapCreationTime = ...
-            %     abs(ego.controller.cbfValuesLog(maneuverStartIdx, 3))^(1-rho)...
-            %     / gamma / (1-rho);
+            obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
             fprintf('Simulation T: %.2f\n', simulationGapCreationTime)
-            % fprintf('Theory T: %.1f\n', theoryGapCreationTime)
+        end
+
+        function [] = lateralTest(obj)
+            finalTime = 20;
+            obj.setStopTime(finalTime);
+
+            nV = 1;
+            names = {'ego'};
+            q0 = zeros(4, nV);
+            y0 = 0;
+            theta0 = 0;
+            vx0 = 20;
+            for n = 1:nV
+                q0(:, n) = [(nV-n) * (vx0 + 1 + 5); y0; theta0; vx0];
+            end
+            desiredVelocity = 30*ones(nV, 1);
+            obj.vehicleArray = BicycleVehicleArray(nV);
+            isConnected = true;
+            obj.vehicleArray.createVehicles(names, obj.simTime, q0, ...
+                desiredVelocity, isConnected)
+
+            % For nicer plots
+            for n = 1:nV
+                obj.vehicleArray.vehs(n).accelBounds(2) = 2;
+                obj.vehicleArray.vehs(n).comfAccelBounds = [-2; 2];
+            end
+
+            leaderAccel = 0;
+            leaderBeta = 1*2*pi/180;
+            for k = 1:(length(obj.simTime)-1)
+                obj.vehicleArray.singleStepUpdate([leaderAccel, leaderBeta]);
+            end
+            ego = obj.vehicleArray.getVehByName('ego');
+            figure; plot(ego.x, ego.y)
+%             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
+            obj.vehicleArray.plotStatesAllVehs({'theta'});
         end
 
         function [] = cbfCheck(obj)

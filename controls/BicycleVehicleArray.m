@@ -23,15 +23,10 @@ classdef BicycleVehicleArray < VehicleArray
             end
         end
 
-        function [] = singleStepUpdate(obj, desiredAccelerations)
-            if nargin > 1
-                m = length(desiredAccelerations);
-            else
-                m = 0;
-            end
+        function [] = singleStepUpdate(obj, leaderInputs)
             for n = 1:length(obj.vehs)
-                if n <= m
-                    obj.vehs(n).computeInput(desiredAccelerations(n));
+                if nargin > 1 && n == 1
+                    obj.vehs(n).computeInput(leaderInputs);
                 else
                     obj.vehs(n).computeInput();
                 end

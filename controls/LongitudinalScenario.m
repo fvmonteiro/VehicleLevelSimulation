@@ -4,12 +4,15 @@ classdef LongitudinalScenario < handle
     properties
 %         stopTime % total simulation time
 %         simTime;
+        samplingPeriod = 0.1
+    end
+
+    properties (SetAccess = protected)
         vehicleArray
     end
-    
+
     properties (SetAccess = private)
-        samplingPeriod = 0.1;
-        simTime;
+        simTime
     end
     
     methods

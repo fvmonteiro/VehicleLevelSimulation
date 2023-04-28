@@ -4,14 +4,13 @@ classdef LongitudinalVehicleModel < Vehicle
     
     properties (SetAccess = protected)
         iterCounter = 1;
-        currentInput  % useless?
+        currentInput
     end
        
     properties (Dependent)
         x0
         vx0
         
-        % States and inputs over entire simulation
         x
         vx
         ax
@@ -19,7 +18,6 @@ classdef LongitudinalVehicleModel < Vehicle
         
         minVehFollGap
 
-        % Current values
         currentTime
         currentState
         position
@@ -141,37 +139,9 @@ classdef LongitudinalVehicleModel < Vehicle
             obj.inputs(:, obj.inputsIdx.u) = value;
         end
 
-        %%% METHODS %%%
+        %%% Methods %%%
         function [value] = hasLeader(obj)
             value = ~isempty(obj.leader);
-        end
-        
-        function [] = includeInSimulation(obj, q0, tau)
-            %includeInSimulation sets the vehicle's initial state,
-            %initializes state matrix, creates system matrices
-%             obj.initialState = q0;
-            
-            obj.inputs = zeros(length(obj.simTime), obj.nInputs);
-            obj.states = zeros(length(obj.simTime), length(q0));
-            obj.states(obj.iterCounter, :) = q0;
-            
-            if tau == 0 % acceleration directly controller
-                obj.A = [0 1; 0 0];
-                obj.B = [0; 1];
-            else % including actuator dynamics
-                obj.statesIdx.ax = 3;
-                obj.tau = tau;
-                obj.A = [0 1 0; 0 0 1; 0 0 -1/obj.tau];
-                obj.B = [0; 0; 1/obj.tau];
-            end
-            obj.C = eye(obj.nStates);
-            obj.D = zeros(obj.nInputs);
-            
-            obj.currentInput = 0;
-            % We assume the initial speed to be the desired one just for
-            % simplicity - it can be changed during simulation
-            obj.desiredVelocity = obj.velocity;
-            
         end
                 
         function [] = resetStates(obj)
@@ -298,8 +268,37 @@ classdef LongitudinalVehicleModel < Vehicle
             inputsWithinSimTime = squeeze(vehArrayInputs(:, 1:lastTimeIndex, :));
             affectedVehIdx = find(max(abs(inputsWithinSimTime))>accelThreshold, 1, 'last');
             totalCost = sum(sum(squeeze(inputsWithinSimTime).^2)*obj.samplingPeriod);
+        end 
+    end
+
+    methods (Access = private)
+        function [] = includeInSimulation(obj, q0, tau)
+            %includeInSimulation sets the vehicle's initial state and other
+            %related properties
+%             obj.initialState = q0;
+            
+            obj.inputs = zeros(length(obj.simTime), 1);
+            obj.states = zeros(length(obj.simTime), length(q0));
+            obj.states(obj.iterCounter, :) = q0;
+            
+            if tau == 0 % acceleration directly controller
+                obj.A = [0 1; 0 0];
+                obj.B = [0; 1];
+            else % including actuator dynamics
+                obj.statesIdx.ax = 3;
+                obj.tau = tau;
+                obj.A = [0 1 0; 0 0 1; 0 0 -1/obj.tau];
+                obj.B = [0; 0; 1/obj.tau];
+            end
+            obj.C = eye(obj.nStates);
+            obj.D = zeros(obj.nInputs);
+            
+            obj.currentInput = 0;
+            % We assume the initial speed to be the desired one just for
+            % simplicity - it can be changed during simulation
+            obj.desiredVelocity = obj.velocity;
+            
         end
-        
     end
 
 end
