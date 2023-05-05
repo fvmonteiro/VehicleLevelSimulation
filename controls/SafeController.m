@@ -29,14 +29,12 @@ classdef SafeController < handle
             switch obj.egoVehicle.maneuverState
                 case VehicleStates.laneKeeping
                     accel = obj.computeLaneKeepingSafeAccel();
-                    beta = 0;
                 case VehicleStates.longitudinalAdjustment
                     accel = obj.computeLongitudinalAdjustmentSafeAccel();
-                    beta = 0;
                 case VehicleStates.laneChanging
-                    [accel, beta] = obj.computeLaneChangeInputs();
+                    accel = obj.computeLaneChangeAccel();
             end
-
+            beta = obj.computeLateralInput();
             obj.iterCounter = obj.iterCounter + 1;
         end
 
@@ -60,7 +58,7 @@ classdef SafeController < handle
             %computeLongitudinalAdjustmentSafeAccel determines the maximum 
             % acceleration input during longitudinal adjustment
 
-            safeAccel = obj.computeLaneKeepingSafeAccel;
+            safeAccel = obj.computeLaneKeepingSafeAccel();
             if obj.egoVehicle.hasLeader()
                 if obj.longitudinalAdjustmentType == 1
                     longAdjustmentAccel = ...
@@ -73,31 +71,34 @@ classdef SafeController < handle
             end
         end
 
-        function [safeAccel, safeBeta] = computeLaneChangeInputs(obj)
-            %computeLaneChangeInputs determines the maximum 
+        function [safeAccel] = computeLaneChangeAccel(obj)
+            %computeLaneChangeInputs determines the maximum
             % safe control input during longitudinal adjustment
+            ego = obj.egoVehicle;
+            ev = ego.computeVelocityReferenceError();
+            vRefDot = ego.computeVelocityReferenceDerivative();
+            psi0 = 2*ev*vRefDot + classKappaFunction('linear', ev^2, 1);
+            psi1 = -2*ev;
+            accelCLF = obj.minNormController(psi0, psi1);
 
+            maxLCaccel = max(ego.comfAccelBounds)/2; % arbitrary
+            safeAccel = min([accelCLF, maxLCaccel,...
+                obj.computeLongitudinalAdjustmentSafeAccel()]);
+        end
+
+        function [safeBeta] = computeLateralInput(obj)
             ego = obj.egoVehicle;
             ey = ego.computeLateralPositionError();
             v = ego.velocity;
             theta = ego.orientation;
             yRefDot = ego.computeLateralReferenceDerivative();
-            if abs(ey) > 10^-5
-                betaCLF = classKappaFunction('linear', ey^2, 1) ...
-                        / (2 * v * cos(theta) * ey) ...
-                        + yRefDot / v / cos(theta) - tan(theta);
-            else
-                betaCLF = 0;
-            end
+            psi0 = 2*ey*(yRefDot - v*sin(theta)) ...
+                + classKappaFunction('linear', ey^2, 1);
+            psi1 = -2*ey*v*cos(theta);
+            betaCLF = obj.minNormController(psi0, psi1);
 
             betaCBF = obj.lateralPositionCBF();
-
-%             if betaCLF > betaCBF
-%                 disp("CBF takes control of LC")
-%             end
-
             safeBeta = min(betaCLF, betaCBF);
-            safeAccel = 0; %obj.computeLongitudinalAdjustmentSafeAccel();
         end
 
 %         function [safeAccel, safeBeta] = CLF_CBF_QP(obj)
@@ -113,7 +114,7 @@ classdef SafeController < handle
             %respects the maximum velocity constraint
             alpha = obj.speedCBFparameter;
             barrierFunctionValue = ...
-                obj.egoVehicle.desiredVelocity - obj.egoVehicle.velocity;
+                obj.egoVehicle.computeVelocityReferenceError();
             obj.cbfValuesLog(obj.iterCounter, 1) = barrierFunctionValue;
             maxAccel = classKappaFunction('linear', barrierFunctionValue, ...
                 alpha);
@@ -230,6 +231,16 @@ classdef SafeController < handle
             barrierFunctionValue = ey + maxOverShoot;
             maxBeta = classKappaFunction('linear', barrierFunctionValue, 1) ...
                 / v / cos(theta) - tan(theta);
+        end
+
+        function [u] = minNormController(~, psi0, psi1)
+            %minNormController Computes the minimum norm controller that
+            %satisfies the CLF constraints described by psi0 and psi1
+            if psi0 > 0
+                u = -psi0/psi1;
+            else
+                u = 0;
+            end
         end
 
         function [] = setFiniteTimeCBFParameters(obj)

@@ -96,7 +96,7 @@ classdef CBFScenarios < LongitudinalScenario
             q0 = zeros(4, nV);
             y0 = 0;
             theta0 = 0;
-            vx0 = 20;
+            vx0 = 30;
             for n = 1:nV
                 q0(:, n) = [(nV-n) * (vx0 + 1 + 5); y0; theta0; vx0];
             end
@@ -110,31 +110,27 @@ classdef CBFScenarios < LongitudinalScenario
             for n = 1:nV
                 obj.vehicleArray.vehs(n).accelBounds(2) = 2;
                 obj.vehicleArray.vehs(n).comfAccelBounds = [-2; 2];
+                obj.vehicleArray.vehs(n).accelBoundsDuringLC(2) = 1;
             end
             
             % Run
             ego = obj.vehicleArray.getVehByName('ego');
             simulationGapCreationTime = -1;
-            leaderInputs = [0; 0];
             for k = 1:(length(obj.simTime)-1)
+                leaderInputs = [0; 0];
+                % if obj.simTime(k) > gapGenerationTime + 1 ...
+                %         && obj.simTime(k) < gapGenerationTime + 2
+                %     leaderInputs = [-5; 0];
+                % end
+
                 if abs(obj.simTime(k) - gapGenerationTime) ...
                         < obj.samplingPeriod/2
-                    ego.hasLaneChangeIntention = true;
+                    ego.setLaneChangeDirection(1);
                 end
-%                 if abs(obj.simTime(k) - gapGenerationTime - 3) ...
-%                         < obj.samplingPeriod/2
-%                     leaderAccel = -ego.maxBrake;
-%                 elseif abs(obj.simTime(k) - gapGenerationTime - 5) ...
-%                         < obj.samplingPeriod/2
-%                     leaderAccel = 0;
-%                 end
-%                 if abs(obj.simTime(k) - 50) < obj.samplingPeriod/2
-%                     ego.hasLaneChangeIntention = false;
-%                 end
 
                 obj.vehicleArray.singleStepUpdate(leaderInputs);
                 
-                if (ego.computeErrorToLaneChangeGap() >= 0 ...
+                if (ego.maneuverState == VehicleStates.laneChanging ...
                         && simulationGapCreationTime < 0)
                     simulationGapCreationTime = obj.simTime(k) ...
                         - gapGenerationTime;

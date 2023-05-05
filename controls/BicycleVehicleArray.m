@@ -25,6 +25,7 @@ classdef BicycleVehicleArray < VehicleArray
 
         function [] = singleStepUpdate(obj, leaderInputs)
             for n = 1:length(obj.vehs)
+                % obj.vehs(n).findLeader(obj.vehs);
                 if nargin > 1 && n == 1
                     obj.vehs(n).computeInput(leaderInputs);
                 else
