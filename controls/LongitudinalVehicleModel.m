@@ -35,9 +35,6 @@ classdef LongitudinalVehicleModel < Vehicle
             % Set input indices
             obj.inputsIdx.u = 1;
             
-%             % For now [03/24/21], all vehicles are passenger vehicles
-%             obj.setVehicleParams('PV');
-            
             if nargin > 0
                 obj.name = name;
                 obj.setVehicleParams(type);
@@ -50,6 +47,8 @@ classdef LongitudinalVehicleModel < Vehicle
 %                 obj.currentState = zeros(2, 1);
 %                 obj.states = zeros(2, 1);
             end
+
+
             
         end
 

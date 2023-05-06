@@ -628,7 +628,10 @@
             lo = allVehicles(strcmpi(allNames, 'Lo'));
             ego = allVehicles(strcmpi(allNames, 'E'));
             if isempty(ego)
-                ego = allVehicles(strcmpi(allNames, 'p1'));
+                ego = allVehicles(strcmpi(allNames, 'ego'));
+                if isempty(ego)
+                    ego = allVehicles(strcmpi(allNames, 'p1'));
+                end
             end
             fo = allVehicles(strcmpi(allNames, 'Fo'));
             ld = allVehicles(strcmpi(allNames, 'Ld'));

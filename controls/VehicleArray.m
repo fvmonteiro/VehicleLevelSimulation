@@ -68,27 +68,6 @@ classdef (Abstract) VehicleArray < handle
         
         %%% GETTERS %%%
         
-        function [requestedVeh] = getVehByName(obj, requestedNames)
-        %getVehByName returns a SimulinkVehicle object array
-            
-            % Allow argument to be a string (or array of characters)
-            if ~iscell(requestedNames)
-                requestedNames = {requestedNames};
-            end
-
-            vehIdx = 0;
-            for n = 1:length(requestedNames)
-                newIdx = strcmpi(obj.vehNames, requestedNames{n});
-                if sum(newIdx)==0
-                    warning('Vehicle %s not found in this array', ...
-                        requestedNames{n});
-                end
-                vehIdx = vehIdx | newIdx;
-            end
-            requestedVeh = obj.vehs(vehIdx);
-
-        end
-        
         function value = get.vehNames(obj)
             value = {obj.vehs.name};
         end
@@ -144,6 +123,44 @@ classdef (Abstract) VehicleArray < handle
         
         function value = get.nInputs(obj)
             value = obj.vehs(1).nInputs;
+        end
+
+        function [requestedVeh] = getVehByName(obj, requestedNames)
+        %getVehByName returns a Vehicle object array
+            
+            % Allow argument to be a string (or array of characters)
+            if ~iscell(requestedNames)
+                requestedNames = {requestedNames};
+            end
+
+            vehIdx = 0;
+            for n = 1:length(requestedNames)
+                newIdx = strcmpi(obj.vehNames, requestedNames{n});
+                if sum(newIdx)==0
+                    warning('Vehicle %s not found in this array', ...
+                        requestedNames{n});
+                end
+                vehIdx = vehIdx | newIdx;
+            end
+            requestedVeh = obj.vehs(vehIdx);
+        end
+
+        function [egoVehicle] = getEgoVehicle(obj)
+
+            % In simulation with a single lane changing vehicle, the
+            % vehicle is usualy called E or ego. In simulations with 
+            % platoons, the vehicles are called p1, p2, ..., pN
+            egoVehicle = obj.getVehByName('E');
+            if isempty(egoVehicle)
+                egoVehicle = obj.getVehByName('ego');
+                if isempty(egoVehicle)
+                    egoVehicle = obj.getVehByName('p1');
+                end
+            end
+            if (isempty(egoVehicle))
+                error(["No ego vehicle found.\nOnly vehicles in array are" ...
+                    obj.vehNames])
+            end
         end
         
         %%% PLOT FUNCTIONS %%%

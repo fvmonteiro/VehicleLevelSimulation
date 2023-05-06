@@ -44,6 +44,7 @@ sim_time = 10;
 
 % References
 y_ts = make_timeseries(Y, t, start_time, sim_time);
+vY_ts = make_timeseries(vY, t, start_time, sim_time);
 % aY_ts = make_timeseries(aY, t, start_time, sim_time);
 vyr_ts = make_timeseries(vyr, t, start_time, sim_time);
 theta_ts = make_timeseries(theta, t, start_time, sim_time);

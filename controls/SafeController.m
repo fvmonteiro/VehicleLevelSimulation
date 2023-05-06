@@ -29,12 +29,15 @@ classdef SafeController < handle
             switch obj.egoVehicle.maneuverState
                 case VehicleStates.laneKeeping
                     accel = obj.computeLaneKeepingSafeAccel();
+                    beta = obj.computeLateralInput();
                 case VehicleStates.longitudinalAdjustment
                     accel = obj.computeLongitudinalAdjustmentSafeAccel();
+                    beta = obj.computeLateralInput();
                 case VehicleStates.laneChanging
                     accel = obj.computeLaneChangeAccel();
+                    beta = obj.computeLateralInput();
+%                     [beta, accel] = obj.computeCombinedInput();
             end
-            beta = obj.computeLateralInput();
             obj.iterCounter = obj.iterCounter + 1;
         end
 
@@ -99,6 +102,35 @@ classdef SafeController < handle
 
             betaCBF = obj.lateralPositionCBF();
             safeBeta = min(betaCLF, betaCBF);
+        end
+
+        function [safeBeta, safeAccel] = computeCombinedInput(obj)
+
+            % NOTE: Easier to solve separately, because then there is no 
+            % need to choose weights
+
+            ego = obj.egoVehicle;
+            v = ego.velocity;
+            theta = ego.orientation;
+            ey = ego.computeLateralPositionError();
+            ev = ego.computeVelocityReferenceError();
+            yRefDot = ego.computeLateralReferenceDerivative();
+            vRefDot = ego.computeVelocityReferenceDerivative();
+
+            wv = 0.000001;
+
+            psi0 = 2*ey*(yRefDot - v*sin(theta)) ...
+                + classKappaFunction('linear', ey^2, 1) ...
+                + 2*wv*ev*vRefDot + classKappaFunction('linear', wv*ev^2, 1);
+            psi1 = [-2*ey*v*cos(theta), -2*wv*ev]'; 
+            uCLF = obj.minNormController(psi0, psi1);
+            betaCLF = uCLF(1);
+            accelCLF = uCLF(2);
+            betaCBF = obj.lateralPositionCBF();
+            safeBeta = min(betaCLF, betaCBF);
+            maxLCaccel = max(ego.comfAccelBounds)/2; % arbitrary
+            safeAccel = min([accelCLF, maxLCaccel,...
+                obj.computeLongitudinalAdjustmentSafeAccel()]);
         end
 
 %         function [safeAccel, safeBeta] = CLF_CBF_QP(obj)
@@ -223,7 +255,7 @@ classdef SafeController < handle
         function [maxBeta] = lateralPositionCBF(obj)
             %lateralPositionCBF CBF that prevents vehicle from overshooting
             %the lane change maneuver
-            maxOverShoot = 3;
+            maxOverShoot = 2;
             ey = obj.egoVehicle.computeLateralErrorToDestLane();
             v = obj.egoVehicle.velocity;
             theta = obj.egoVehicle.orientation;
@@ -237,10 +269,32 @@ classdef SafeController < handle
             %minNormController Computes the minimum norm controller that
             %satisfies the CLF constraints described by psi0 and psi1
             if psi0 > 0
-                u = -psi0/psi1;
+                u = -(psi0*psi1)/(psi1'*psi1);
             else
-                u = 0;
+                u = zeros(length(psi1), 1);
             end
+        end
+
+        function [minBeta, maxBeta] = ...
+                lateralPositionWithInputConstraintsCBF(obj)
+            %lateralPositionCBF CBF that prevents vehicle from overshooting
+            %the lane change maneuver
+            maxOverShoot = -1;
+            ey = obj.egoVehicle.computeLateralErrorToDestLane();
+            v = obj.egoVehicle.velocity;
+            theta = obj.egoVehicle.orientation;
+
+            % With input constraints
+            betaBound = 0.01;
+
+            barrierFunctionValue = ey + maxOverShoot ...
+                - obj.egoVehicle.lr * (cos(theta + betaBound) + 1) ...
+                / betaBound;
+            minBeta = betaBound * (1 ...
+                - classKappaFunction('linear', barrierFunctionValue, 1)...
+                / v / sin(theta));
+            maxBeta = -minBeta;
+
         end
 
         function [] = setFiniteTimeCBFParameters(obj)

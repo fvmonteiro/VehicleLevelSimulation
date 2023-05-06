@@ -4,6 +4,7 @@ classdef CBFScenarios < LongitudinalScenario
 
     properties
         cbfCheckMargin = -0.1 % due to discretization errors
+        debugStopTime = -1
     end
 
     methods
@@ -25,13 +26,13 @@ classdef CBFScenarios < LongitudinalScenario
             names = {'leader', 'follower'};
             % Create vehicles
 
-            q0L = [6, 0, 0, 0]';
-            q0F = [0, 0, 0, 0]';
-            q = [q0L, q0F];
+            x0 = [6, 0];
+            v0 = [0, 0];
+            lanes = [0, 0];
             desiredVelocity = [30; 30];
             isConnected = true;
-            obj.vehicleArray.createVehicles(names, obj.simTime, q, ...
-                desiredVelocity, isConnected)
+            obj.vehicleArray.createVehicles(names, obj.simTime, x0, v0, ...
+                lanes, desiredVelocity, isConnected)
             
             % Run
             leader = obj.vehicleArray.getVehByName(names(1));
@@ -62,19 +63,18 @@ classdef CBFScenarios < LongitudinalScenario
             
             nV = 2;
             names = cell(nV, 1);
-            q0 = zeros(4, nV);
-            y0 = 0;
-            theta0 = 0;
-            vx0 = 0;
+            x0 = zeros(nV, 1);
+            v0 = zeros(nV, 1);
+            lanes = zeros(nV, 1);
             for n = 1:nV
                 names{n} = ['veh' num2str(n)];
-                q0(:, n) = [(nV-n) * (vx0 + 1 + 5); y0; theta0; vx0];
+                x0(n) = (nV-n) * (v0(n) + 1 + 5);
             end
             desiredVelocity = 30*ones(nV, 1);
             isConnected = true;
             obj.vehicleArray = BicycleVehicleArray(nV);
-            obj.vehicleArray.createVehicles(names, obj.simTime, q0, ...
-                desiredVelocity, isConnected)
+            obj.vehicleArray.createVehicles(names, obj.simTime, x0, v0, ...
+                lanes, desiredVelocity, isConnected)
             
             % Run
             amplitude = 3;
@@ -87,24 +87,28 @@ classdef CBFScenarios < LongitudinalScenario
         end
 
         function [] = gapIncrease(obj)
-            finalTime = 100;
-            gapGenerationTime = 5;
+            finalTime = 30;
+            gapGenerationTime = 1;
             obj.setStopTime(finalTime);
 
-            nV = 3;
-            names = {'lo', 'ego', 'fo'};
-            q0 = zeros(4, nV);
-            y0 = 0;
-            theta0 = 0;
-            vx0 = 30;
-            for n = 1:nV
-                q0(:, n) = [(nV-n) * (vx0 + 1 + 5); y0; theta0; vx0];
+            names = {'lo', 'ego', 'fo', 'ld'};
+            leaderSpeed = 15;
+
+            nV = length(names);
+            x0 = zeros(nV, 1);
+            v0 = leaderSpeed*ones(nV, 1);
+            lanes = zeros(nV, 1);
+            for n = 1:(nV - 1)
+                x0(n) = (nV-n) * (v0(n) + 1 + 5);
             end
-            desiredVelocity = 30*ones(nV, 1);
+            x0(nV) = x0(3);
+            lanes(nV) = 1;
+
+            desiredVelocity = [leaderSpeed, 20, 20, leaderSpeed];
             obj.vehicleArray = BicycleVehicleArray(nV);
             isConnected = true;
-            obj.vehicleArray.createVehicles(names, obj.simTime, q0, ...
-                desiredVelocity, isConnected)
+            obj.vehicleArray.createVehicles(names, obj.simTime, x0, v0, ...
+                lanes, desiredVelocity, isConnected)
 
             % For nicer plots
             for n = 1:nV
@@ -117,17 +121,13 @@ classdef CBFScenarios < LongitudinalScenario
             ego = obj.vehicleArray.getVehByName('ego');
             simulationGapCreationTime = -1;
             for k = 1:(length(obj.simTime)-1)
-                leaderInputs = [0; 0];
-                % if obj.simTime(k) > gapGenerationTime + 1 ...
-                %         && obj.simTime(k) < gapGenerationTime + 2
-                %     leaderInputs = [-5; 0];
-                % end
-
+                
                 if abs(obj.simTime(k) - gapGenerationTime) ...
                         < obj.samplingPeriod/2
                     ego.setLaneChangeDirection(1);
                 end
 
+                leaderInputs = [0; 0];
                 obj.vehicleArray.singleStepUpdate(leaderInputs);
                 
                 if (ego.maneuverState == VehicleStates.laneChanging ...
@@ -138,11 +138,13 @@ classdef CBFScenarios < LongitudinalScenario
             end
             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
             obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
+            obj.vehicleArray.createAnimation();
             fprintf('Simulation T: %.2f\n', simulationGapCreationTime)
         end
 
         function [] = lateralTest(obj)
-            finalTime = 20;
+            finalTime = 15;
+            lcStartTime = 5;
             obj.setStopTime(finalTime);
 
             nV = 1;
@@ -154,7 +156,7 @@ classdef CBFScenarios < LongitudinalScenario
             for n = 1:nV
                 q0(:, n) = [(nV-n) * (vx0 + 1 + 5); y0; theta0; vx0];
             end
-            desiredVelocity = 30*ones(nV, 1);
+            desiredVelocity = vx0*ones(nV, 1);
             obj.vehicleArray = BicycleVehicleArray(nV);
             isConnected = true;
             obj.vehicleArray.createVehicles(names, obj.simTime, q0, ...
@@ -166,15 +168,17 @@ classdef CBFScenarios < LongitudinalScenario
                 obj.vehicleArray.vehs(n).comfAccelBounds = [-2; 2];
             end
 
-            leaderAccel = 0;
-            leaderBeta = 1*2*pi/180;
-            for k = 1:(length(obj.simTime)-1)
-                obj.vehicleArray.singleStepUpdate([leaderAccel, leaderBeta]);
-            end
             ego = obj.vehicleArray.getVehByName('ego');
-            figure; plot(ego.x, ego.y)
-%             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
-            obj.vehicleArray.plotStatesAllVehs({'theta'});
+            for k = 1:(length(obj.simTime)-1)
+                if abs(obj.simTime(k) - lcStartTime) ...
+                        < obj.samplingPeriod/2
+                    ego.setLaneChangeDirection(1);
+                end
+                obj.vehicleArray.singleStepUpdate();
+            end
+            
+%             figure; plot(ego.x, ego.y)
+            obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
         end
 
         function [] = cbfCheck(obj)

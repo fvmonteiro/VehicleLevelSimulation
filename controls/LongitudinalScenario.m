@@ -21,16 +21,14 @@ classdef LongitudinalScenario < handle
 % %         obj.simTime = 0:samplingPeriod:stopTime;
 %     end
 
+    function [] = updateSamplingPeriod(obj, value)
+        obj.samplingPeriod = value;
+        obj.setStopTime(obj.simTime(end));
+    end
+
     function setStopTime(obj, stopTime)
         obj.simTime = 0:obj.samplingPeriod:stopTime;
     end
-    
-%     function [] = runSingleStep(obj, reference)
-%         for n = 1:length(obj.vehicleArray)
-%             vehicle = obj.vehicleArray(n);
-%             vehicle.singleStepUpdate(reference(n));
-%         end
-%     end
     
     end
 end

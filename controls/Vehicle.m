@@ -9,6 +9,7 @@ classdef (Abstract) Vehicle < handle
     properties
         name
         plotName % name to appear in plot legends
+        plotColor
         type % passenger vehicle (PV) or heavy-duty vehicle (HDV)
         
         % TODO: leader should be moved to SetAccess = protect and there 
@@ -143,6 +144,26 @@ classdef (Abstract) Vehicle < handle
 
         function value = get.maxBrakeLaneChanging(obj)
             value = abs(min(obj.accelBoundsDuringLC));
+        end
+
+        function value = getColor(obj)
+            if isempty(obj.plotColor)
+                obj.setDefaultColor();
+            end
+            value = obj.plotColor;
+        end
+
+        function [] = setDefaultColor(obj)
+            if strcmpi(obj.name, 'E') || strcmpi(obj.name, 'ego') ...
+                || strcmpi(obj.name, 'p1')
+                obj.plotColor = [1, 0, 0]; % red
+            elseif contains(obj.name, 'p')
+                obj.plotColor = [1 0.5 0];
+            elseif strcmpi(obj.name, 'fd')
+                obj.plotColor = [0 1 0]; % green
+            else
+                obj.plotColor = [0.5 0.5 0.5]; % grey
+            end
         end
         
         %%% Safe gap computations %%%
