@@ -27,6 +27,10 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
         theta % vehicle orientation
         beta % angle between veh orientation and veh speed
 
+        % Initial values
+        y0
+        theta0
+
         % Current values
         lateralPosition
         orientation
@@ -108,6 +112,14 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             value = obj.states(obj.iterCounter, obj.statesIdx.theta);
         end
 
+        function value = get.theta0(obj)
+            value = obj.states(1, obj.statesIdx.theta);
+        end
+
+        function value = get.y0(obj)
+            value = obj.states(1, obj.statesIdx.y);
+        end
+
         %%%%%%%%%%%%%%%
         
         function [] = setInitialLaneValues(obj, lane)
@@ -135,8 +147,9 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
 
         function [] = analyzeSurroundingVehicles(obj, otherVehicles)
             obj.findLeader(otherVehicles);
-            obj.findDestinationLaneLeader(otherVehicles);
+            obj.findDestinationLaneVehicles(otherVehicles);
         end
+
         function [] = findLeader(obj, otherVehicles)
             %findLeader recieves an array of vehicles, determines which are
             %on the same lane, then determines which one is longitudinally 
@@ -162,15 +175,17 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
         end
 
         function [] = findDestinationLaneVehicles(obj, otherVehicles)
+            hadDestLaneLeader = obj.hasDestLaneLeader();
+
             obj.destLaneLeader = [];
-            obj.destLaneFollwer = [];
+            obj.destLaneFollower = [];
             if obj.hasLaneChangeIntention()
                 closestAhead = inf;
                 closestBehind = -Inf;
                 for k = 1:length(otherVehicles)
                     otherVeh = otherVehicles(k);
                     relativeX = otherVeh.position - obj.position;
-                    if obj.destinationLane == otherVehicles(k).currentLane
+                    if obj.destinationLane == otherVeh.currentLane
                         if obj.isOtherAhead(otherVeh) ...
                                 && relativeX < closestAhead
                             closestAhead = relativeX;
@@ -183,12 +198,19 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
                     end
                 end
             end
+
+            if ~hadDestLaneLeader && obj.hasDestLaneLeader()
+                obj.controller.activateCreateGapToDestLaneLeader();
+            end
+
         end
 
         %%% UPDATING METHODS %%%
         function [q] = updateStates(obj)
             %singleStepUpdate computes system states after one step given
             %inputs computed in the last step
+
+            obj.updateManeuverState();
 
             % Current states and inputs
             xNow = obj.position;
@@ -220,7 +242,6 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             obj.delta(obj.iterCounter) = atan(...
                 tan(betaNow) * (obj.lf + obj.lr) / obj.lr);
             obj.updateCurrentLane();
-            obj.updateManeuverState();
         end
 
         function [u1, u2] = computeInput(obj, externalInput)
@@ -236,30 +257,39 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
 
         %%% TRACKING/ REFERENCE ERRORS %%%
         function [value] = computeErrorToDesiredGap(obj, timeHeadway, ...
-                egoMaxBrake)
+                egoMaxBrake, aLeader)
             %errorToDesiredGap computes the difference between current gap 
             % and the desired (collision free) gap
-            gap = obj.computeCurrentGapToLeader();
+            if nargin < 4
+                aLeader = obj.leader;
+            end
+            gap = obj.computeGapToVehicle(aLeader);
             egoVel = obj.velocity;
-            leaderVel = obj.leader.velocity;
+            leaderVel = aLeader.velocity;
             minimumGap = timeHeadway*egoVel + obj.d0 ...
                 + egoVel^2/2/egoMaxBrake ...
-                - leaderVel^2/2/obj.leader.maxBrake;
+                - leaderVel^2/2/aLeader.maxBrake;
             value = gap - minimumGap;
         end
 
-        function [value] = computeErrorToLaneKeepingGap(obj)
+        function [value] = computeErrorToLaneKeepingGap(obj, aLeader)
             %errorToLaneKeepingGap computes the difference between current 
             % gap and the safe gap during lane keeping
+            if nargin < 2
+                aLeader = obj.leader;
+            end
             value = obj.computeErrorToDesiredGap(obj.h, ...
-                obj.maxBrake);
+                obj.maxBrake, aLeader);
         end
 
-        function [value] = computeErrorToLaneChangeGap(obj)
+        function [value] = computeErrorToLaneChangeGap(obj, aLeader)
             %errorToLaneChangeGap computes the difference between current 
             % gap and the lane changing gap
+            if nargin < 2
+                aLeader = obj.leader;
+            end
             value = obj.computeErrorToDesiredGap(obj.hLC, ...
-                obj.maxBrakeLaneChanging);
+                obj.maxBrakeLaneChanging, aLeader);
         end
 
         function [ey] = computeLateralPositionError(obj)
@@ -389,12 +419,12 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             oldState = obj.maneuverState;
             if obj.maneuverState == VehicleStates.laneKeeping
                 if obj.hasLaneChangeIntention()
-                    obj.controller.activateLaneChangingCBF();
+                    obj.controller.activateIncreaseGapToLeader();
                     obj.maneuverState = ...
                         VehicleStates.longitudinalAdjustment;
                 end
             elseif obj.maneuverState == VehicleStates.longitudinalAdjustment
-                if obj.computeErrorToLaneChangeGap >= 0
+                if obj.isSafeToStartLaneChange()
                     obj.computeLaneChangeTrajectoryCoefficients();
                     obj.computeLaneChangeVelocityTrajectoryCoefficients();
                     obj.laneChangeStartTime = obj.currentTime;
@@ -415,6 +445,36 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
                     obj.currentTime, oldState, obj.maneuverState);
             end
 
+        end
+
+        function [bool] = isSafeToStartLaneChange(obj)
+            
+            if obj.hasLeader()
+                gapErrorToLeader = obj.computeErrorToLaneChangeGap( ...
+                    obj.leader);
+            else
+                gapErrorToLeader = 1;
+            end
+            if obj.hasDestLaneLeader()
+                gapErrorToDestLaneLeader = obj.computeErrorToLaneChangeGap( ...
+                    obj.destLaneLeader);
+            else
+                gapErrorToDestLaneLeader = 1;
+            end
+            if obj.hasDestLaneFollower()
+                gapErrorToDestLaneFollower = ...
+                    obj.destLaneFollower.computeErrorToLaneKeepingGap(obj);
+            else
+                gapErrorToDestLaneFollower = 1;
+            end
+            bool = gapErrorToLeader >= 0 ...
+                && gapErrorToDestLaneLeader >= 0 ...
+                && gapErrorToDestLaneFollower >= 0;
+
+            if bool
+                fprintf('lo: %.2f, ld: %.2f, fd: %.2f\n', gapErrorToLeader,...
+                    gapErrorToDestLaneLeader, gapErrorToDestLaneFollower);
+            end
         end
 
         function [bool] = isLaneChangeComplete(obj)

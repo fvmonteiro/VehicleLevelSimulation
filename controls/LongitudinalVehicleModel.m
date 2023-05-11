@@ -197,6 +197,10 @@ classdef LongitudinalVehicleModel < Vehicle
                 gap = obj.leader.x(k) - obj.leader.len - obj.x(k);
             end
         end
+
+        function [gap] = computeGapToVehicle(obj, otherVehicle)
+            gap = otherVehicle.position - otherVehicle.len - obj.position;
+        end
         
         function [] = setController(obj, controlType, controlParams)
             setController@Vehicle(obj, controlType, controlParams);

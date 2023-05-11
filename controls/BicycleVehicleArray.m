@@ -24,7 +24,7 @@ classdef BicycleVehicleArray < VehicleArray
 
         function [] = singleStepUpdate(obj, leaderInputs)
             for n = 1:length(obj.vehs)
-                obj.vehs(n).findLeader(obj.vehs);
+                obj.vehs(n).analyzeSurroundingVehicles(obj.vehs);
                 if nargin > 1 && n == 1
                     obj.vehs(n).computeInput(leaderInputs);
                 else
@@ -48,12 +48,12 @@ classdef BicycleVehicleArray < VehicleArray
             minX = ego.x - 25;
             videoWidth = 50; % TODO: make based on initial (final?) vEgo
             videoXLims = [minX, minX + videoWidth];
-            videoYLims = [min(ego.y) - ego.width, ...
-                max(ego.y) + ego.width*2];
+            minY = min([obj.vehs.y0]) - ego.width;
+            maxY = max([obj.vehs.y0]) + 2*ego.width;
+            videoYLims = [minY, maxY];
             
             % Lane marks coordinates
-            laneLineYCoord = ones(1,2)*(ego.y(end) + ego.width ...
-                + ego.y(1))/2;
+            laneLineYCoord = ones(1,2)*(minY + maxY)/2;
             laneLineXCoord = [0, videoXLims(end, 2)+15];
             
             % Create figure and subplots, set axes limits, labels etc

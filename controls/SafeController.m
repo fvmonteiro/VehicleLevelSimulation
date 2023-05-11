@@ -4,11 +4,15 @@ classdef SafeController < handle
         speedCBFparameter = 1
         safeDistCBFparameter = 1
         longAdjustmentStartTime
-        % TODO: Make it a parameter chosen by the vehicle
-        longitudinalAdjustmentType = 1 % 1 for Finite Time CBF
+%         longitudinalAdjustmentType = 1 % 1 for Finite Time CBF
                                        % 2 for Time Varying CBF
-        laneChangeGapCBFparameter % rho, gamma for Finite Time CBF
-                                  % h0 for Time Varying CBF 
+        % Finite Time CBF params
+        leaderlaneChangeGapCBFparameter % rho, gamma for Finite Time CBF
+        leaderRho
+        leaderGamma
+        destLaneLeaderRho
+        destLaneLeaderGamma
+
         longitudinalAdjustmentStartFlag = false
     end
 
@@ -41,9 +45,12 @@ classdef SafeController < handle
             obj.iterCounter = obj.iterCounter + 1;
         end
 
-        function [] = activateLaneChangingCBF(obj)
-            obj.longitudinalAdjustmentStartFlag = true;
-            obj.longAdjustmentStartTime = obj.egoVehicle.currentTime;
+        function [] = activateIncreaseGapToLeader(obj)
+            obj.setFiniteTimeCBFParameters(obj.egoVehicle.leader);
+        end
+
+        function [] = activateCreateGapToDestLaneLeader(obj)
+            obj.setFiniteTimeCBFParameters(obj.egoVehicle.destLaneLeader);
         end
 
         %%% Inputs for each phase %%%
@@ -60,17 +67,18 @@ classdef SafeController < handle
         function [safeAccel] = computeLongitudinalAdjustmentSafeAccel(obj)
             %computeLongitudinalAdjustmentSafeAccel determines the maximum 
             % acceleration input during longitudinal adjustment
-
             safeAccel = obj.computeLaneKeepingSafeAccel();
             if obj.egoVehicle.hasLeader()
-                if obj.longitudinalAdjustmentType == 1
-                    longAdjustmentAccel = ...
-                        obj.laneChangingGapFiniteTimeCBF();
-                elseif obj.longitudinalAdjustmentType == 2
-                    longAdjustmentAccel = ...
-                        obj.laneChangingGapTimeVaryingCBF();
-                end
-                safeAccel = min(safeAccel, longAdjustmentAccel);
+                realLeaderAccelBound = ...
+                    obj.laneChangingGapFiniteTimeCBF(...
+                    obj.egoVehicle.leader);
+                safeAccel = min(safeAccel, realLeaderAccelBound);
+            end
+            if obj.egoVehicle.hasDestLaneLeader()
+                virtualLeaderAccelBound = ...
+                    obj.laneChangingGapFiniteTimeCBF(...
+                    obj.egoVehicle.destLaneLeader);
+                safeAccel = min(safeAccel, virtualLeaderAccelBound);
             end
         end
 
@@ -176,20 +184,19 @@ classdef SafeController < handle
             maxAccel = term1 * term2;
         end
 
-        function [maxAccel] = laneChangingGapFiniteTimeCBF(obj)
+        function [maxAccel] = laneChangingGapFiniteTimeCBF(obj, leader)
 
             timeHeadway = obj.egoVehicle.hLC;
             minAccel= obj.egoVehicle.maxBrakeLaneChanging;
-            leader = obj.egoVehicle.leader;
             v2v = obj.egoVehicle.isConnected && leader.isConnected;
             egoVelocity = obj.egoVehicle.velocity;
             barrierFunctionValue = ...
-                obj.egoVehicle.computeErrorToLaneChangeGap();
+                obj.egoVehicle.computeErrorToLaneChangeGap(leader);
             obj.cbfValuesLog(obj.iterCounter, 3) = barrierFunctionValue;
             
-            obj.setFiniteTimeCBFParameters();
-            rho = obj.laneChangeGapCBFparameter(1);
-            gamma = obj.laneChangeGapCBFparameter(2);
+            %%%% TODO %%%%
+            rho = obj.leaderRho;
+            gamma = obj.leaderGamma;
 
             if barrierFunctionValue < 0
                 kappaType = 'exponential';
@@ -216,7 +223,7 @@ classdef SafeController < handle
             alpha = obj.safeDistCBFparameter;
             obj.setTimeVaryingCBFParameters();
 
-            timeHeadway0 = obj.laneChangeGapCBFparameter;
+            timeHeadway0 = obj.leaderlaneChangeGapCBFparameter;
             timeHeadwayLC = obj.egoVehicle.hLC;
             minAccel = obj.egoVehicle.maxBrakeLaneChanging;
             time = obj.egoVehicle.currentTime;
@@ -297,22 +304,32 @@ classdef SafeController < handle
 
         end
 
-        function [] = setFiniteTimeCBFParameters(obj)
-            if obj.longitudinalAdjustmentStartFlag == true
-                cbfValue = obj.egoVehicle.computeErrorToLaneChangeGap();
-                epsilon = 0.1;
-                rho = epsilon;
-                veh = obj.egoVehicle;
-                c = veh.hLC*veh.maxBrakeLaneChanging;
-                gamma = c / abs(cbfValue)^rho;
-                obj.laneChangeGapCBFparameter = [rho, gamma];
-                fprintf("Expected T: %.2f\n", -cbfValue/(1-rho)/c);
-                obj.longitudinalAdjustmentStartFlag = false;
+        function [] = setFiniteTimeCBFParameters(obj, leader)
+%             if obj.longitudinalAdjustmentStartFlag == true
+            cbfValue = obj.egoVehicle.computeErrorToLaneChangeGap(leader);
+            epsilon = 0.1;
+            rho = epsilon;
+            veh = obj.egoVehicle;
+            c = veh.hLC*veh.maxBrakeLaneChanging;
+            gamma = c / abs(cbfValue)^rho;
+            if obj.egoVehicle.currentLane == leader.currentLane
+                obj.leaderRho = rho;
+                obj.leaderGamma = gamma;
+            else
+                obj.destLaneLeaderRho = rho;
+                obj.destLaneLeaderGamma = gamma;
             end
+            fprintf("Expected T: %.2f\n", ...
+                veh.currentTime -cbfValue/(1-rho)/c);
+%             obj.longitudinalAdjustmentStartFlag = false;
+%             end
         end
 
+        % NOT UP TO DATE
         function [] = setTimeVaryingCBFParameters(obj)
+            warning('Time Varying CBF code not up to date')
             if obj.longitudinalAdjustmentStartFlag == true
+                obj.longAdjustmentStartTime = obj.egoVehicle.currentTime;
                 timeHeadwayLK = obj.egoVehicle.h;
                 timeHeadwayLC = obj.egoVehicle.hLC;
                 maxBrakeLK = obj.egoVehicle.maxBrake;
@@ -324,7 +341,7 @@ classdef SafeController < handle
                 virtualTimeHeadway = timeHeadwayLK ...
                     + maxSpeed * (1/maxBrakeLK - 1/maxBrakeLC) / 2 ...
                     + safeDistanceCBF / maxSpeed;
-                obj.laneChangeGapCBFparameter = virtualTimeHeadway;
+                obj.leaderlaneChangeGapCBFparameter = virtualTimeHeadway;
                 expectedTime = maxSpeed / maxBrakeLC ...
                     * log(timeHeadwayLC - virtualTimeHeadway + 1);
                 fprintf("Expected T: %.2f\n", expectedTime);

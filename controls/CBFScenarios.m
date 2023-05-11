@@ -101,7 +101,7 @@ classdef CBFScenarios < LongitudinalScenario
             for n = 1:(nV - 1)
                 x0(n) = (nV-n) * (v0(n) + 1 + 5);
             end
-            x0(nV) = x0(3);
+            x0(nV) = (x0(3) + x0(2))/2;
             lanes(nV) = 1;
 
             desiredVelocity = [leaderSpeed, 20, 20, leaderSpeed];
@@ -132,14 +132,13 @@ classdef CBFScenarios < LongitudinalScenario
                 
                 if (ego.maneuverState == VehicleStates.laneChanging ...
                         && simulationGapCreationTime < 0)
-                    simulationGapCreationTime = obj.simTime(k) ...
-                        - gapGenerationTime;
+                    simulationGapCreationTime = obj.simTime(k);
                 end
             end
-            obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
-            obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
-            obj.vehicleArray.createAnimation();
             fprintf('Simulation T: %.2f\n', simulationGapCreationTime)
+%             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
+%             obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
+%             obj.vehicleArray.createAnimation();
         end
 
         function [] = lateralTest(obj)
