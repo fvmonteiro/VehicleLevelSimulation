@@ -1,23 +1,6 @@
 classdef (Abstract) Vehicle < handle
     
-    properties (Constant, Hidden = true)
-        mpsToKmph = 3.6;
-        minTau = 0.01 % actuator delay
-        namesThatChangeForPlot = {'Fd', 'Fo', 'Ld', 'Lo'}
-    end
-    
     properties
-        name
-        plotName % name to appear in plot legends
-        plotColor
-        type % passenger vehicle (PV) or heavy-duty vehicle (HDV)
-        
-        % TODO: leader should be moved to SetAccess = protect and there 
-        % should be a method setLeader (not sure if on parent or derived
-        % classes) to be sure time headway is updated when a leader is set
-        leader % preceding vehicle
-        %         virtualLeader
-        
         % Vehicle following parameters:
         h % time headway for ACC given difference in decelerations and
         % assumed difference in speeds and max speed
@@ -31,12 +14,6 @@ classdef (Abstract) Vehicle < handle
         tau % actuator lag
         reactionTime = 0.2 % time to start emergency braking
         desiredVelocity
-%         initialState
-        
-        % Storing simulation results
-        simTime % simulation time
-        inputs
-        states % matrix to store the vehicle states obtained in simulation
         
         % Input constraints
         accelBounds
@@ -45,11 +22,44 @@ classdef (Abstract) Vehicle < handle
         comfJerkBounds
         accelBoundsDuringLC
     end
-    
-    properties (SetAccess = protected)
-        controller
+
+    properties (Hidden = true)
+        % TODO: leader should be moved to SetAccess = protect and there 
+        % should be a method setLeader (not sure if on parent or derived
+        % classes) to be sure time headway is updated when a leader is set
+        leader % preceding vehicle
+        %         virtualLeader
+
+        plotName % name to appear in plot legends
+        plotColor
+
+        % Storing simulation results
+        simTime % simulation time
+        inputs
+        states % matrix to store the vehicle states obtained in simulation
+    end
+
+    properties (Dependent)
+        nStates
+        nInputs
+        minVFGap0
+        maxBrake
+        maxBrakeLaneChanging
     end
     
+    properties (Abstract, Dependent)
+        x0
+        vx0
+        x
+        vx
+        u
+    end
+    
+    properties (SetAccess = protected)
+        name
+        controller
+    end
+
     properties (SetAccess = protected, Hidden = true)
         % System matrices
         A
@@ -74,26 +84,23 @@ classdef (Abstract) Vehicle < handle
         % decelerations and speeds
         lambda2LC % same as above but during lane change
     end
-    
-    properties (Dependent)
-        nStates
-        nInputs
-        minVFGap0
-        maxBrake
-        maxBrakeLaneChanging
-%         worstCaseBrakeLeading
-%         worstCaseBrakeFollowing
+
+    properties(SetAccess = private)
+        id
+        type % passenger vehicle (PV) or heavy-duty vehicle (HDV)
     end
-    
-    properties (Abstract, Dependent)
-        x0
-        vx0
-        x
-        vx
-        u
+
+    properties (Constant, Access = private, Hidden = true)
+        mpsToKmph = 3.6;
+        minTau = 0.01 % actuator delay
+        namesThatChangeForPlot = {'Fd', 'Fo', 'Ld', 'Lo'}
     end
     
     methods
+
+        function obj = Vehicle()
+            obj.id = Vehicle.getNextId();
+        end
         
         function [] = setVehicleParams(obj, vehType)
             if ~any(contains(VehicleTypes.possibleTypes, vehType))
@@ -594,8 +601,18 @@ classdef (Abstract) Vehicle < handle
             end
             lineSpecs(emptyIdx) = [];
             
-        end
-        
+        end 
     end
+
+    methods (Access = private, Static)
+      function out = getNextId()
+         persistent Var;
+         if isempty(Var)
+            Var = 0;
+         end
+         Var = Var + 1;
+         out = Var;
+      end
+   end
     
 end

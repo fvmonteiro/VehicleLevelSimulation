@@ -665,20 +665,20 @@
             end
             allVehicles(idxToDelete) = [];
             
-            %%% TO DO: probably don't need a loop to do this
-            vehColors = cell(1, length(allVehicles));
-            for n = 1:length(allVehicles)
-                if strcmpi(allVehicles(n).name, 'p1') ...
-                        || strcmp(allVehicles(n).name, 'E')
-                    vehColors{n} = [1 0 0]; % red
-                elseif contains(allVehicles(n).name, 'p')
-                    vehColors{n} = [1 0.5 0];
-                elseif strcmpi(allVehicles(n).name, 'fd')
-                    vehColors{n} = [0 1 0]; % green
-                else
-                    vehColors{n} = [0.5 0.5 0.5]; % grey
-                end
-            end
+            %%% [May 5, 23] Colors are now a property of the vehicle 
+            % vehColors = cell(1, length(allVehicles));
+            % for n = 1:length(allVehicles)
+            %     if strcmpi(allVehicles(n).name, 'p1') ...
+            %             || strcmp(allVehicles(n).name, 'E')
+            %         vehColors{n} = [1 0 0]; % red
+            %     elseif contains(allVehicles(n).name, 'p')
+            %         vehColors{n} = [1 0.5 0];
+            %     elseif strcmpi(allVehicles(n).name, 'fd')
+            %         vehColors{n} = [0 1 0]; % green
+            %     else
+            %         vehColors{n} = [0.5 0.5 0.5]; % grey
+            %     end
+            % end
             
             % Simulation time
             simTime = ego.simTime;
@@ -781,7 +781,7 @@
                     vehImg = patch(animationAxis, ...
                         [vehX vehX+veh.len vehX+veh.len vehX vehX], ...
                         [vehY vehY vehY+veh.width vehY+veh.width vehY], ...
-                        vehColors{nV});
+                        veh.plotColor{nV});
                     rotate(vehImg, [0 0 1], vehPsi, [vehX vehY 0])
                     % Include arrows to indicate speed
 %                     obj.drawArrow(gca, 

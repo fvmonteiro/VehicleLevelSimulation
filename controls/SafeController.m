@@ -103,13 +103,27 @@ classdef SafeController < handle
             v = ego.velocity;
             theta = ego.orientation;
             yRefDot = ego.computeLateralReferenceDerivative();
-            psi0 = 2*ey*(yRefDot - v*sin(theta)) ...
-                + classKappaFunction('linear', ey^2, 1);
-            psi1 = -2*ey*v*cos(theta);
-            betaCLF = obj.minNormController(psi0, psi1);
+            
+            ky = 1;
+            betaCLF = (yRefDot + ky*ey) / (v * cos(theta)) - tan(theta);
 
-            betaCBF = obj.lateralPositionCBF();
-            safeBeta = min(betaCLF, betaCBF);
+            zeta = 0.01;
+            cbf1 = ey + zeta;
+            cbf2 = -ey + zeta;
+            betaLow = (yRefDot - ky*cbf2) / (v * cos(theta)) - tan(theta);
+            betaHigh = (yRefDot + ky*cbf1) / (v * cos(theta)) - tan(theta);
+
+            safeBeta = median([betaLow, betaCLF, betaHigh]);
+            if betaCLF < betaLow || betaCLF > betaHigh
+                a=1;
+            end
+            % psi0 = 2*ey*(yRefDot - v*sin(theta)) ...
+            %     + classKappaFunction('linear', ey^2, 1);
+            % psi1 = -2*ey*v*cos(theta);
+            % betaCLF = obj.minNormController(psi0, psi1);
+            % 
+            % betaCBF = obj.lateralPositionCBF();
+            % safeBeta = min(betaCLF, betaCBF);
         end
 
         function [safeBeta, safeAccel] = computeCombinedInput(obj)

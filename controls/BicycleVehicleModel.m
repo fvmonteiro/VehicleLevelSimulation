@@ -15,10 +15,7 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
     % dv/dt = a
     % beta = arctan(lr/(lf+lr) tan(delta))
     properties
-        yRefLog
-        vRefLog
-
-        laneWidth = 4
+        
     end
 
     properties (SetAccess = private, Dependent)
@@ -54,6 +51,20 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
 
         destLaneLeader
         destLaneFollower
+        vehicleRequestingCooperation
+        virtualLeader
+
+        yRefLog
+        vRefLog
+        leaderIdLog
+        destLaneLeaderLog
+        destLaneFollowerLog
+        vehicleRequestingCooperationLog
+        virtualLeaderLog
+    end
+
+    properties (Constant = true, Hidden = true)
+        laneWidth = 4
     end
     
     methods
@@ -121,12 +132,6 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
         end
 
         %%%%%%%%%%%%%%%
-        
-        function [] = setInitialLaneValues(obj, lane)
-            obj.originLane = lane;
-            obj.currentLane = lane;
-            obj.destinationLane = lane;
-        end
 
         function [] = setLaneChangeDirection(obj, value)
             obj.destinationLane = obj.destinationLane + value;
@@ -145,6 +150,14 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             bool = ~isempty(obj.destLaneFollower);
         end
 
+        function [bool] = hasReceivedCooperationRequest(obj)
+            bool = ~isempty(obj.vehicleRequestingCooperation);
+        end
+
+        function [bool] = hasVirtualLeader(obj)
+            bool = ~isempty(obj.virtualLeader);
+        end
+
         function [] = analyzeSurroundingVehicles(obj, otherVehicles)
             obj.findLeader(otherVehicles);
             obj.findDestinationLaneVehicles(otherVehicles);
@@ -159,7 +172,7 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             for k = 1:length(otherVehicles)
                 otherVeh = otherVehicles(k);
                 relativeX = otherVeh.position - obj.position;
-                if obj.isOnSameLane(otherVehicles(k)) ...
+                if obj.isOnSameLane(otherVeh) ...
                         && obj.isOtherAhead(otherVeh) ...
                         && relativeX < closestX
                     closestX = relativeX;
@@ -169,14 +182,14 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
 
             if leaderIdx > 0
                 obj.leader = otherVehicles(leaderIdx);
+                obj.leaderIdLog(obj.iterCounter) = obj.leader.id;
             else
                 obj.leader = [];
+                obj.leaderIdLog(obj.iterCounter) = 0;
             end
         end
 
         function [] = findDestinationLaneVehicles(obj, otherVehicles)
-            hadDestLaneLeader = obj.hasDestLaneLeader();
-
             obj.destLaneLeader = [];
             obj.destLaneFollower = [];
             if obj.hasLaneChangeIntention()
@@ -199,10 +212,41 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
                 end
             end
 
-            if ~hadDestLaneLeader && obj.hasDestLaneLeader()
-                obj.controller.activateCreateGapToDestLaneLeader();
+            if obj.hasDestLaneLeader()
+                obj.destLaneLeaderLog(obj.iterCounter) = ...
+                    obj.destLaneLeader.id;
+                if obj.isDestLaneLeaderNew()
+                    obj.controller.activateCreateGapToDestLaneLeader();
+                end
+            else
+                obj.destLaneLeaderLog(obj.iterCounter) = 0;
+            end
+        end
+
+        function [] = findCooperationRequest(obj)
+            closestX = inf;
+            coopRequestIdx = -1;
+            for k = 1:length(otherVehicles)
+                otherVeh = otherVehicles(k);
+                relativeX = otherVeh.position - obj.position;
+                if ~obj.isOnSameLane(otherVeh) ...
+                        && obj.currentLane == otherVeh.destLane ...
+                        && obj.isOtherAhead(otherVeh) ...
+                        && relativeX < closestX
+                    closestX = relativeX;
+                    coopRequestIdx = k;
+                end
             end
 
+            if coopRequestIdx > 0
+                obj.vehicleRequestingCooperation = ...
+                    otherVehicles(coopRequestIdx);
+                obj.vehicleRequestingCooperationLog(obj.iterCounter) = ...
+                    obj.leader.id;
+            else
+                obj.vehicleRequestingCooperation = [];
+                obj.vehicleRequestingCooperationLog(obj.iterCounter) = 0;
+            end
         end
 
         %%% UPDATING METHODS %%%
@@ -222,6 +266,9 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             betaNow = obj.beta(obj.iterCounter);
             
             % Increments
+            if obj.iterCounter + 1 > length(obj.simTime)
+                return
+            end
             sampling = obj.simTime(obj.iterCounter + 1) ...
                 - obj.simTime(obj.iterCounter);
             dx = vNow*cos(thetaNow + betaNow) * sampling;
@@ -371,16 +418,27 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             %includeInSimulation sets the vehicle's initial state and
             % initializes state matrix
 
-            % Create all matrices
+            % Preallocate all arrays
             n = length(obj.simTime);
             obj.inputs = zeros(n, obj.nInputs);
             obj.delta = zeros(n, 1);
             obj.states = zeros(n, obj.nStates);
             obj.yRefLog = zeros(n, 1);
             obj.vRefLog = zeros(n, 1);
-            
+            obj.leaderIdLog = zeros(n, 1);
+            obj.destLaneLeaderLog = zeros(n, 1);
+            obj.destLaneFollowerLog = zeros(n, 1);
+            obj.virtualLeaderLog = zeros(n, 1);
+            obj.vehicleRequestingCooperationLog = zeros(n, 1);
+
             % Initialize
             obj.states(obj.iterCounter, :) = q0;
+        end
+
+        function [] = setInitialLaneValues(obj, lane)
+            obj.originLane = lane;
+            obj.currentLane = lane;
+            obj.destinationLane = lane;
         end
 
         function [] = computeLaneChangeTrajectoryCoefficients(obj)
@@ -498,6 +556,30 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
 
         function [bool] = isOtherBehind(obj, otherVehicle)
             bool = otherVehicle.position < obj.position;
+        end
+
+        function [bool] = isLeaderNew(obj)
+            bool = obj.isOtherVehicleNew(obj.leader, obj.leaderIdLog);
+        end
+
+        function [bool] = isDestLaneLeaderNew(obj)
+            bool = obj.isOtherVehicleNew(obj.destLaneLeader, ...
+                obj.destLaneLeaderLog);
+        end
+
+        function [bool] = isDestLaneFollowerNew(obj)
+            bool = obj.isOtherVehicleNew(obj.destLaneFollower, ...
+                obj.destLaneFollowerLog);
+        end
+
+        function [bool] = isOtherVehicleNew(obj, otherVehicle, idLog)
+             if ~isempty(otherVehicle) && (obj.iterCounter == 0 || ...
+                    (idLog(obj.iterCounter - 1) ...
+                    ~= otherVehicle.id))
+                bool = true;
+            else
+                bool = false;
+            end
         end
 
     end

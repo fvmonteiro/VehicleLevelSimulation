@@ -87,24 +87,33 @@ classdef CBFScenarios < LongitudinalScenario
         end
 
         function [] = gapIncrease(obj)
-            finalTime = 30;
+            clear Vehicle % reset vehicle ids
+            finalTime = 15;
             gapGenerationTime = 1;
             obj.setStopTime(finalTime);
 
-            names = {'lo', 'ego', 'fo', 'ld'};
+            names = {'lo', 'ego', 'fo'}; %, 'vd1', 'vd2', 'vd3', 'vd4'};
             leaderSpeed = 15;
+            otherSpeed = 20;
 
             nV = length(names);
+            nVOrigLane = 3;
+            % nVDestLane = nV - nVOrigLane;
             x0 = zeros(nV, 1);
             v0 = leaderSpeed*ones(nV, 1);
             lanes = zeros(nV, 1);
-            for n = 1:(nV - 1)
-                x0(n) = (nV-n) * (v0(n) + 1 + 5);
+            for n = 1:nVOrigLane
+                x0(n) = (nVOrigLane - n) * (leaderSpeed + 1 + 5);
             end
-            x0(nV) = (x0(3) + x0(2))/2;
-            lanes(nV) = 1;
+            for n = nVOrigLane+1:nV
+                x0(n) = (nV - n - 2) * (leaderSpeed + 1 + 5);
+                lanes(n) = 1;
+            end
+            
+            desiredVelocity = otherSpeed * ones(nV, 1);
+            desiredVelocity(1) = leaderSpeed;
+            desiredVelocity(nVOrigLane + 1) = leaderSpeed;
 
-            desiredVelocity = [leaderSpeed, 20, 20, leaderSpeed];
             obj.vehicleArray = BicycleVehicleArray(nV);
             isConnected = true;
             obj.vehicleArray.createVehicles(names, obj.simTime, x0, v0, ...
@@ -120,7 +129,7 @@ classdef CBFScenarios < LongitudinalScenario
             % Run
             ego = obj.vehicleArray.getVehByName('ego');
             simulationGapCreationTime = -1;
-            for k = 1:(length(obj.simTime)-1)
+            for k = 1:(length(obj.simTime))
                 
                 if abs(obj.simTime(k) - gapGenerationTime) ...
                         < obj.samplingPeriod/2
@@ -136,9 +145,11 @@ classdef CBFScenarios < LongitudinalScenario
                 end
             end
             fprintf('Simulation T: %.2f\n', simulationGapCreationTime)
-%             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
-%             obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
-%             obj.vehicleArray.createAnimation();
+            % obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
+            % obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
+            % obj.vehicleArray.createAnimation();
+            figure; hold on; grid on; plot(ego.simTime, ego.yRefLog-ego.y);
+            disp(max(abs(ego.yRefLog-ego.y)));
         end
 
         function [] = lateralTest(obj)
