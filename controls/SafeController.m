@@ -12,6 +12,8 @@ classdef SafeController < handle
         leaderGamma
         destLaneLeaderRho
         destLaneLeaderGamma
+        incomingVehicleRho
+        incomingVehicleGamma
 
         longitudinalAdjustmentStartFlag = false
     end
@@ -33,24 +35,40 @@ classdef SafeController < handle
             switch obj.egoVehicle.maneuverState
                 case VehicleStates.laneKeeping
                     accel = obj.computeLaneKeepingSafeAccel();
-                    beta = obj.computeLateralInput();
+%                     beta = obj.computeLateralInput();
                 case VehicleStates.longitudinalAdjustment
                     accel = obj.computeLongitudinalAdjustmentSafeAccel();
-                    beta = obj.computeLateralInput();
+%                     beta = obj.computeLateralInput();
                 case VehicleStates.laneChanging
                     accel = obj.computeLaneChangeAccel();
-                    beta = obj.computeLateralInput();
+%                     beta = obj.computeLateralInput();
 %                     [beta, accel] = obj.computeCombinedInput();
+                case VehicleStates.cooperating
+                    accel = obj.computeCooperatingAccel();
             end
+            beta = obj.computeLateralInput();
             obj.iterCounter = obj.iterCounter + 1;
         end
 
         function [] = activateIncreaseGapToLeader(obj)
-            obj.setFiniteTimeCBFParameters(obj.egoVehicle.leader);
+            [rho, gamma] = obj.setFiniteTimeCBFParameters(...
+                obj.egoVehicle.leader);
+            obj.leaderRho = rho;
+            obj.leaderGamma = gamma;
         end
 
         function [] = activateCreateGapToDestLaneLeader(obj)
-            obj.setFiniteTimeCBFParameters(obj.egoVehicle.destLaneLeader);
+            [rho, gamma] = obj.setFiniteTimeCBFParameters(...
+                obj.egoVehicle.destLaneLeader);
+            obj.destLaneLeaderRho = rho;
+            obj.destLaneLeaderGamma = gamma;
+        end
+
+        function [] = activateCreateGapToIncomingVehicle(obj)
+            [rho, gamma] = obj.setFiniteTimeCBFParameters(...
+                obj.egoVehicle.vehicleRequestingCooperation);
+            obj.incomingVehicleRho = rho;
+            obj.incomingVehicleGamma = gamma;
         end
 
         %%% Inputs for each phase %%%
@@ -71,13 +89,14 @@ classdef SafeController < handle
             if obj.egoVehicle.hasLeader()
                 realLeaderAccelBound = ...
                     obj.laneChangingGapFiniteTimeCBF(...
-                    obj.egoVehicle.leader);
+                    obj.egoVehicle.leader, obj.leaderRho, obj.leaderGamma);
                 safeAccel = min(safeAccel, realLeaderAccelBound);
             end
             if obj.egoVehicle.hasDestLaneLeader()
                 virtualLeaderAccelBound = ...
                     obj.laneChangingGapFiniteTimeCBF(...
-                    obj.egoVehicle.destLaneLeader);
+                    obj.egoVehicle.destLaneLeader, obj.destLaneLeaderRho,...
+                    obj.destLaneLeaderGamma);
                 safeAccel = min(safeAccel, virtualLeaderAccelBound);
             end
         end
@@ -97,6 +116,13 @@ classdef SafeController < handle
                 obj.computeLongitudinalAdjustmentSafeAccel()]);
         end
 
+        function [safeAccel] = computeCooperatingAccel(obj)
+            coopAccel = obj.laneChangingGapFiniteTimeCBF( ...
+                obj.egoVehicle.vehicleRequestingCooperation, ...
+                obj.incomingVehicleRho, obj.incomingVehicleGamma);
+            safeAccel = min(coopAccel, obj.computeLaneKeepingSafeAccel());
+        end
+
         function [safeBeta] = computeLateralInput(obj)
             ego = obj.egoVehicle;
             ey = ego.computeLateralPositionError();
@@ -114,9 +140,6 @@ classdef SafeController < handle
             betaHigh = (yRefDot + ky*cbf1) / (v * cos(theta)) - tan(theta);
 
             safeBeta = median([betaLow, betaCLF, betaHigh]);
-            if betaCLF < betaLow || betaCLF > betaHigh
-                a=1;
-            end
             % psi0 = 2*ey*(yRefDot - v*sin(theta)) ...
             %     + classKappaFunction('linear', ey^2, 1);
             % psi1 = -2*ey*v*cos(theta);
@@ -198,7 +221,8 @@ classdef SafeController < handle
             maxAccel = term1 * term2;
         end
 
-        function [maxAccel] = laneChangingGapFiniteTimeCBF(obj, leader)
+        function [maxAccel] = laneChangingGapFiniteTimeCBF(obj, leader,...
+                rho, gamma)
 
             timeHeadway = obj.egoVehicle.hLC;
             minAccel= obj.egoVehicle.maxBrakeLaneChanging;
@@ -207,10 +231,6 @@ classdef SafeController < handle
             barrierFunctionValue = ...
                 obj.egoVehicle.computeErrorToLaneChangeGap(leader);
             obj.cbfValuesLog(obj.iterCounter, 3) = barrierFunctionValue;
-            
-            %%%% TODO %%%%
-            rho = obj.leaderRho;
-            gamma = obj.leaderGamma;
 
             if barrierFunctionValue < 0
                 kappaType = 'exponential';
@@ -318,25 +338,16 @@ classdef SafeController < handle
 
         end
 
-        function [] = setFiniteTimeCBFParameters(obj, leader)
-%             if obj.longitudinalAdjustmentStartFlag == true
+        function [rho, gamma] = setFiniteTimeCBFParameters(obj, leader)
             cbfValue = obj.egoVehicle.computeErrorToLaneChangeGap(leader);
             epsilon = 0.1;
             rho = epsilon;
             veh = obj.egoVehicle;
             c = veh.hLC*veh.maxBrakeLaneChanging;
             gamma = c / abs(cbfValue)^rho;
-            if obj.egoVehicle.currentLane == leader.currentLane
-                obj.leaderRho = rho;
-                obj.leaderGamma = gamma;
-            else
-                obj.destLaneLeaderRho = rho;
-                obj.destLaneLeaderGamma = gamma;
-            end
-            fprintf("Expected T: %.2f\n", ...
+            fprintf("Gap generation from veh %d to %d.\n\t" + ...
+                "Expected T: %.2f\n", obj.egoVehicle.id, leader.id, ...
                 veh.currentTime -cbfValue/(1-rho)/c);
-%             obj.longitudinalAdjustmentStartFlag = false;
-%             end
         end
 
         % NOT UP TO DATE

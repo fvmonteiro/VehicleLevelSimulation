@@ -1,6 +1,8 @@
 classdef (Abstract) Vehicle < handle
     
     properties
+        simTime % simulation time
+        
         % Vehicle following parameters:
         h % time headway for ACC given difference in decelerations and
         % assumed difference in speeds and max speed
@@ -34,7 +36,6 @@ classdef (Abstract) Vehicle < handle
         plotColor
 
         % Storing simulation results
-        simTime % simulation time
         inputs
         states % matrix to store the vehicle states obtained in simulation
     end

@@ -28,6 +28,9 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
         y0
         theta0
 
+        % Final value
+        yf
+
         % Current values
         lateralPosition
         orientation
@@ -131,6 +134,10 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             value = obj.states(1, obj.statesIdx.y);
         end
 
+        function value = get.yf(obj)
+            value = obj.states(end, obj.statesIdx.y);
+        end
+
         %%%%%%%%%%%%%%%
 
         function [] = setLaneChangeDirection(obj, value)
@@ -161,6 +168,9 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
         function [] = analyzeSurroundingVehicles(obj, otherVehicles)
             obj.findLeader(otherVehicles);
             obj.findDestinationLaneVehicles(otherVehicles);
+            obj.findCooperationRequest(otherVehicles);
+
+            obj.updateManeuverState();
         end
 
         function [] = findLeader(obj, otherVehicles)
@@ -223,14 +233,18 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             end
         end
 
-        function [] = findCooperationRequest(obj)
-            closestX = inf;
+        function [] = findCooperationRequest(obj, otherVehicles)
+            if obj.hasLeader && obj.leader.isConnected
+                closestX = obj.leader.position - obj.position;
+            else
+                closestX = inf;
+            end
             coopRequestIdx = -1;
             for k = 1:length(otherVehicles)
                 otherVeh = otherVehicles(k);
                 relativeX = otherVeh.position - obj.position;
                 if ~obj.isOnSameLane(otherVeh) ...
-                        && obj.currentLane == otherVeh.destLane ...
+                        && obj.currentLane == otherVeh.destinationLane ...
                         && obj.isOtherAhead(otherVeh) ...
                         && relativeX < closestX
                     closestX = relativeX;
@@ -242,7 +256,7 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
                 obj.vehicleRequestingCooperation = ...
                     otherVehicles(coopRequestIdx);
                 obj.vehicleRequestingCooperationLog(obj.iterCounter) = ...
-                    obj.leader.id;
+                    otherVehicles(coopRequestIdx).id;
             else
                 obj.vehicleRequestingCooperation = [];
                 obj.vehicleRequestingCooperationLog(obj.iterCounter) = 0;
@@ -253,8 +267,6 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
         function [q] = updateStates(obj)
             %singleStepUpdate computes system states after one step given
             %inputs computed in the last step
-
-            obj.updateManeuverState();
 
             % Current states and inputs
             xNow = obj.position;
@@ -480,6 +492,9 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
                     obj.controller.activateIncreaseGapToLeader();
                     obj.maneuverState = ...
                         VehicleStates.longitudinalAdjustment;
+                elseif obj.hasReceivedCooperationRequest()
+                    obj.controller.activateCreateGapToIncomingVehicle();
+                    obj.maneuverState = VehicleStates.cooperating;
                 end
             elseif obj.maneuverState == VehicleStates.longitudinalAdjustment
                 if obj.isSafeToStartLaneChange()
@@ -491,16 +506,23 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
                 elseif ~obj.hasLaneChangeIntention()
                     obj.maneuverState = VehicleStates.laneKeeping;
                 end
-            else % lane changing
+            elseif obj.maneuverState == VehicleStates.laneChanging
                 if obj.isLaneChangeComplete()
                     obj.originLane = obj.destinationLane;
                     obj.maneuverState = VehicleStates.laneKeeping;
                 end
+            elseif obj.maneuverState == VehicleStates.cooperating
+                if ~obj.hasReceivedCooperationRequest()
+                    obj.maneuverState = VehicleStates.laneKeeping;
+                end
+            else
+                error("Error: Unknown vehicle state\n" + ...
+                    "\tid=%d, t=%.2f", obj.id, obj.currentTime);
             end
 
             if oldState ~= obj.maneuverState
-                fprintf("t=%.1f: Transition from %s to %s\n", ...
-                    obj.currentTime, oldState, obj.maneuverState);
+                fprintf("veh %d, t=%.1f: Transition from %s to %s\n", ...
+                    obj.id, obj.currentTime, oldState, obj.maneuverState);
             end
 
         end
@@ -528,11 +550,6 @@ classdef BicycleVehicleModel < LongitudinalVehicleModel
             bool = gapErrorToLeader >= 0 ...
                 && gapErrorToDestLaneLeader >= 0 ...
                 && gapErrorToDestLaneFollower >= 0;
-
-            if bool
-                fprintf('lo: %.2f, ld: %.2f, fd: %.2f\n', gapErrorToLeader,...
-                    gapErrorToDestLaneLeader, gapErrorToDestLaneFollower);
-            end
         end
 
         function [bool] = isLaneChangeComplete(obj)

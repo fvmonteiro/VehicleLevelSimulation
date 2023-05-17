@@ -49,7 +49,7 @@ classdef BicycleVehicleArray < VehicleArray
             videoWidth = 50; % TODO: make based on initial (final?) vEgo
             videoXLims = [minX, minX + videoWidth];
             minY = min([obj.vehs.y0]) - ego.width;
-            maxY = max([obj.vehs.y0]) + 2*ego.width;
+            maxY = max([obj.vehs.yf]) + 2*ego.width;
             videoYLims = [minY, maxY];
             
             % Lane marks coordinates

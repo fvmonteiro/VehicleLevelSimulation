@@ -86,13 +86,13 @@ classdef CBFScenarios < LongitudinalScenario
             obj.cbfCheck();
         end
 
-        function [] = gapIncrease(obj)
+        function [] = laneChange(obj)
             clear Vehicle % reset vehicle ids
-            finalTime = 15;
+            finalTime = 30;
             gapGenerationTime = 1;
             obj.setStopTime(finalTime);
 
-            names = {'lo', 'ego', 'fo'}; %, 'vd1', 'vd2', 'vd3', 'vd4'};
+            names = {'lo', 'ego', 'fo', 'vd1', 'vd2', 'vd3', 'vd4'};
             leaderSpeed = 15;
             otherSpeed = 20;
 
@@ -145,11 +145,10 @@ classdef CBFScenarios < LongitudinalScenario
                 end
             end
             fprintf('Simulation T: %.2f\n', simulationGapCreationTime)
-            % obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
-            % obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
-            % obj.vehicleArray.createAnimation();
-            figure; hold on; grid on; plot(ego.simTime, ego.yRefLog-ego.y);
-            disp(max(abs(ego.yRefLog-ego.y)));
+%             obj.vehicleArray.plotStatesAllVehs({'gap', 'vx', 'ax'});
+%             obj.vehicleArray.plotStatesAllVehs({'y', 'theta', 'delta'});
+            obj.vehicleArray.createAnimation();
+%             figure; hold on; grid on; plot(ego.simTime, ego.yRefLog-ego.y);
         end
 
         function [] = lateralTest(obj)
